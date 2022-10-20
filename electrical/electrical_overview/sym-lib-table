@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name "arduino")(type "KiCad")(uri "${KIPRJMOD}/lib/arduino.kicad_sym")(options "")(descr ""))
+  (lib (name "hc-sr04")(type "KiCad")(uri "${KIPRJMOD}/lib/hc-sr04.kicad_sym")(options "")(descr ""))
+)
