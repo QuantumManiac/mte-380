@@ -4,6 +4,10 @@ Ultrasonic::Ultrasonic() {
 
 }
 
+/**
+ * @brief initializes ultrasonic sensor
+ * 
+ */
 void Ultrasonic::initialize() {
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
@@ -11,7 +15,11 @@ void Ultrasonic::initialize() {
     Serial.print("Ultrasonic Init");
 }
 
-
+/**
+ * @brief Gets distance from ultrasonic sensor
+ * 
+ * @return float distance in cm
+ */
 float Ultrasonic::getDist() {
     long duration;
     float distance;
