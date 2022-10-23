@@ -20,8 +20,9 @@ void setup()
     ultrasonic.initialize();
     motors.initialize();
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
-
+    Serial.println("Waiting for start button press");
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
+    Serial.println("Start button pressed");
     delay(5000); // When start button is pressed, wait 5 secs before starting
 }
 

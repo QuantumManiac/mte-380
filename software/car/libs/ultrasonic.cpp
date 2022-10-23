@@ -12,7 +12,7 @@ void Ultrasonic::initialize() {
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
 
-    Serial.print("Ultrasonic Init");
+    Serial.println("Ultrasonic Init");
 }
 
 /**
