@@ -4,6 +4,8 @@
 #include "libs/motors.cpp"
 #include "libs/ultrasonic.cpp"
 
+#define START_BUTTON_PIN 32
+
 IMU imu;
 Ultrasonic ultrasonic;
 Motors motors;
@@ -17,6 +19,10 @@ void setup()
     imu.initialize();
     ultrasonic.initialize();
     motors.initialize();
+    pinMode(START_BUTTON_PIN, INPUT_PULLUP);
+
+    while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
+    delay(5000); // When start button is pressed, wait 5 secs before starting
 }
 
 void loop()
