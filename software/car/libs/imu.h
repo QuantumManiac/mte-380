@@ -39,7 +39,7 @@ float G_off[3] = {124.6, -68.0, 40.0}; //raw offsets, determined for gyro at res
 #define Ki 0.0
 
 
-typedef struct IMUData{
+struct IMUData{
     float yaw;
     float pitch;
     float roll;
@@ -55,7 +55,7 @@ class IMU {
         MPU9250 accelgyro;
         I2Cdev   I2C_M;
         
-        IMUData data;
+        IMUData data = {0,0,0};
         
         //raw data scaled as vector
         int16_t ax, ay, az;

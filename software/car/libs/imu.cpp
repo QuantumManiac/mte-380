@@ -3,11 +3,10 @@
 
 IMU::IMU() {
     // Variables for AHRS loop timing
-    unsigned long now = 0, last = 0; //micros() timers
-    float deltat = 0;  //loop time in seconds
-    float q[4] = {1.0f, 0.0f, 0.0f, 0.0f}; // vector to hold quaternion
-    IMUData data = {0,0,0};
-
+    now = 0, last = 0; //micros() timers
+    deltat = 0;  //loop time in seconds
+    data = {0,0,0};
+    q[0] = 1.0; // vector to hold quaternion should initialize as {1.0, 0.0, 0.0, 0.0}
 }
 
 /**
@@ -16,7 +15,6 @@ IMU::IMU() {
  */
 void IMU::initialize() {
     while (!Serial); // wait for connection
-
     // Initialize MPU9250 device
     accelgyro.initialize();
     // verify connection
