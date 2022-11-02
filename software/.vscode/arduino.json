@@ -1,0 +1,7 @@
+{
+    "board": "arduino:avr:mega",
+    "port": "/dev/ttyACM0",
+    "programmer": "arduino:avrisp",
+    "sketch": "car/car.ino",
+    "configuration": "cpu=atmega2560"
+}

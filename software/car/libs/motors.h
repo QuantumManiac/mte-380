@@ -16,8 +16,8 @@ A and B must be opposite logic levels (e.g. if IN_A is HIGH, IN_B is LOW). Swap 
 */
 
 #define FL_ENABLE_PIN 8 
-#define FL_IN_A_PIN 0
-#define FL_IN_B_PIN 1
+#define FL_IN_A_PIN 30
+#define FL_IN_B_PIN 31
 // Back-left motor
 #define BL_ENABLE_PIN 9 
 #define BL_IN_A_PIN 2

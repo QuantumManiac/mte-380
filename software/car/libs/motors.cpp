@@ -19,13 +19,17 @@ void Motors::initialize() {
  * @param direction the direction to set the motor to
  */
 void Motors::setMotorDirection(Motor motor, MotorDirection direction) {
-    bool isForward = direction == MotorDirection::forward;
-    digitalWrite(IN_A_PINS[motor], isForward);
-    digitalWrite(IN_B_PINS[motor], !isForward);
+    if (direction == MotorDirection::forward) {
+        digitalWrite(IN_A_PINS[motor], HIGH);
+        digitalWrite(IN_B_PINS[motor], LOW);
+    } else {
+        digitalWrite(IN_A_PINS[motor], LOW);
+        digitalWrite(IN_B_PINS[motor], HIGH);
+    }
 }
 
 /**
- * @brief Sets power of the given motor
+ * @brief Sets power of given motor
  * 
  * @param motor the motor to set power of
  * @param power percentage power of max power to set motor to. Value between 0 and 1.
