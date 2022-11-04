@@ -1,0 +1,7 @@
+{
+    "board": "arduino:avr:mega",
+    "programmer": "arduino:usbasp",
+    "sketch": "software\\car\\car.ino",
+    "port": "COM4",
+    "configuration": "cpu=atmega2560"
+}
