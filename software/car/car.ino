@@ -29,7 +29,7 @@ void loop()
         printSensorData();
     }
 
-    // processCommand();  
+    processCommand();  
 }
 
 void printSensorData() {
@@ -48,8 +48,12 @@ void processCommand() {
     if (command != -1) {
         Serial.println(command);
         if (command == 'q') { 
+            motors.setMotorDirection(front_right, backward);
+            motors.setMotorDirection(back_right, backward);
+            motors.setMotorDirection(back_left, forward);
+            motors.setMotorDirection(front_left, forward);
+
             for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorDirection(Motor(i), forward);
                 motors.setMotorPower(Motor(i), 1);
             }
         } else if (command == 'a') {

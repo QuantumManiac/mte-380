@@ -35,7 +35,7 @@ A and B must be opposite logic levels (e.g. if IN_A is HIGH, IN_B is LOW). Swap 
 // Config //
 ////////////
 
-#define UNSAFE_PWM false    // Set true to use the max possible PWM value
+#define UNSAFE_PWM true    // Set true to use the max possible PWM value
 #define MAX_PWM 255         // Maxiumum possible PWM value
 #define MAX_SAFE_PWM 200    // Maxiumum "safe" PWM value. Going over this value will most likely overdrive the motors
 

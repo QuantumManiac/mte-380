@@ -3,9 +3,9 @@
 
 IMU::IMU() {
   MPU9250_DMP imu;
-  yaw_offset = 0;
-  pitch_offset = 0;
-  roll_offset = 0;
+  float yaw_offset = 0.;
+  float pitch_offset = 0.;
+  float roll_offset = 0.;
 }
 
 /**
@@ -55,13 +55,21 @@ void IMU::setZeroes(bool yaw, bool pitch, bool roll) {
 }
 
 IMUData IMU::getIMUData() {
-  float raw_yaw = imu.yaw;
-  float raw_pitch = imu.pitch;
-  float raw_roll = imu.roll;
+  float yaw = imu.yaw;
+  float pitch = imu.pitch;
+  float roll = imu.roll;
 
-  float yaw = (raw_yaw + yaw_offset) % 360;
-  float pitch = (raw_pitch + pitch_offset) % 360;
-  float roll = (raw_roll + roll_offset) % 360;
+  if (yaw > 360) {
+    yaw -= 360;
+  }
+
+  if (pitch > 360) {
+    pitch -= 360;
+  }
+
+  if (roll > 360) {
+    roll -= 360;
+  }
 
   if (yaw < 0) {
     yaw += 360;

@@ -27,7 +27,7 @@ class IMU {
 
         void updateIMUState();
 
-        void setZeroes(yaw, pitch, roll);
+        void setZeroes(bool yaw, bool pitch, bool roll);
 
         IMUData getIMUData();
 };
