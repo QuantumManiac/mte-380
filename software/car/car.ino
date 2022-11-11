@@ -110,6 +110,10 @@ void loop()
         printSensorData();
     }
 
+	delay(10000);
+
+	imu.setZeroes(true, true, true);
+
     for (int i = 0; i < NUMTURNS; i ++) {
 		distanceToWall = ultrasonic.getDist();
 		//start motors
