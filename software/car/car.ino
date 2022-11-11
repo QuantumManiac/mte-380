@@ -4,7 +4,7 @@
 #include "libs/motors.cpp"
 #include "libs/ultrasonic.cpp"
 
-#define START_BUTTON_PIN 32
+#define START_BUTTON_PIN 53
 
 IMU imu;
 Ultrasonic ultrasonic;
@@ -12,7 +12,7 @@ Motors motors;
 
 const int NUMTURNS = 11;
 const float MINDIST = 5;
-const float MAX_PITCH = 10;
+const float MAX_PITCH = 45;
 
 float distToTurn[NUMTURNS] = {13, 13, 13, 43, 43, 43, 43, 73, 73, 73, 73};
 
@@ -57,10 +57,11 @@ void runMotors(float left, float right) {
 }
 
 void turn(int turnNum) {
-	if (ultrasonic.getDist() < distToTurn[turnNum]) {
-		//stop motors
-		runMotors(leftTurn, rightTurn);
-	}
+	// stop motors
+	runMotors(0, 0);
+
+	// turn left and turn right
+	runMotors(leftTurn, rightTurn);
 
 	float currentAngle = imu.getIMUData().yaw;
 	while (imu.getIMUData().yaw < (currentAngle + 90)) {
@@ -123,8 +124,9 @@ void loop()
             if (millis() - lastSensorPrint > 1000) {
                 lastSensorPrint = millis();
             }
-			if (imu.getIMUData().pitch < abs(MAX_PITCH))
+			if (imu.getIMUData().pitch < abs(MAX_PITCH)) {
 				distanceToWall = ultrasonic.getDist();
+			}
 			//checkDistance();
 			//adjustThread.check();
 		}
