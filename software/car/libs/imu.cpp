@@ -3,10 +3,8 @@
 
 IMU::IMU() {
     // Variables for AHRS loop timing
-    now = 0, last = 0; //micros() timers
-    deltat = 0;  //loop time in seconds
+    tau = 0.98;
     data = {0,0,0};
-    q[0] = 1.0; // vector to hold quaternion should initialize as {1.0, 0.0, 0.0, 0.0}
 }
 
 /**
@@ -16,10 +14,11 @@ IMU::IMU() {
 void IMU::initialize() {
     while (!Serial); // wait for connection
     // Initialize MPU9250 device
-    accelgyro.initialize();
+    setup_mpu_6050_registers();
     // verify connection
-    Serial.println(accelgyro.testConnection() ? "MPU9250 OK" : "MPU9250 ??");
-    last = micros();
+    Serial.println("MPU9250 OK");
+    loopTimer = micros();
+    loopTimer2 = micros();
 }
 
 /**
@@ -27,45 +26,44 @@ void IMU::initialize() {
  * 
  */
 void IMU::updateIMUState() {
-    getMPUScaled();
-    now = micros();
-    deltat = (now - last) * 1.0e-6; //seconds since last update
-    last = now;
+    freq = 1/((micros() - loopTimer2) * 1e-6);
+    loopTimer2 = micros();
+    dt = 1/freq;
 
-    // correct for differing accelerometer and magnetometer alignment by circularly permuting mag axes
-    mahonyQuaternionUpdate(Axyz[0], Axyz[1], Axyz[2], Gxyz[0], Gxyz[1], Gxyz[2],
-                            Mxyz[1], Mxyz[0], -Mxyz[2], deltat);
+    // Read the raw acc data from MPU-6050
+    read_mpu_6050_data();
 
-    // Tait-Bryan angles.
-    // Yaw is the angle between Sensor x-axis and Earth magnetic North
-    // (or true North if corrected for local declination, looking down on the sensor
-    // positive yaw is counterclockwise, which is not conventional for navigation.
-    // Pitch is angle between sensor x-axis and Earth ground plane, toward the
-    // Earth is positive, up toward the sky is negative. Roll is angle between
-    // sensor y-axis and Earth ground plane, y-axis up is positive roll. These
-    // arise from the definition of the homogeneous rotation matrix constructed
-    // from quaternions. Tait-Bryan angles as well as Euler angles are
-    // non-commutative; that is, the get the correct orientation the rotations
-    // must be applied in the correct order which for this configuration is yaw,
-    // pitch, and then roll.
-    // http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
-    // which has additional links.
-    
-    // Warning: strictly valid only for approximately level movement. This code WILL MALFUNCTION
-    // for certain orientations! DEMONSTRATION VERSION only.
-    
-    float roll  = atan2((q[0] * q[1] + q[2] * q[3]), 0.5 - (q[1] * q[1] + q[2] * q[2]));
-    float pitch = asin(2.0 * (q[0] * q[2] - q[1] * q[3]));
-    float yaw   = atan2((q[1] * q[2] + q[0] * q[3]), 0.5 - ( q[2] * q[2] + q[3] * q[3]));
-    // to degrees
-    yaw   *= 180.0 / PI;
-    pitch *= 180.0 / PI;
-    roll *= 180.0 / PI;
+    // Subtract the offset calibration value
+    gyro_x -= G_off[0];
+    gyro_y -= G_off[1];
+    gyro_z -= G_off[2];
 
-    yaw = -yaw + 15.0;
-    if (yaw < 0) yaw += 360.0;
-    if (yaw >= 360.0) yaw -= 360.0;
-    data = {yaw, pitch, roll};
+    // Convert to instantaneous degrees per second
+    rotation_x = (double)gyro_x / (double)scaleFactorGyro;
+    rotation_y = (double)gyro_y / (double)scaleFactorGyro;
+    rotation_z = (double)gyro_z / (double)scaleFactorGyro;
+
+    // Convert to g force
+    accel_x = (double)acc_x / (double)scaleFactorAccel;
+    accel_y = (double)acc_y / (double)scaleFactorAccel;
+    accel_z = (double)acc_z / (double)scaleFactorAccel;
+
+    // Complementary filter
+    accelPitch = atan2(accel_y, accel_z) * RAD_TO_DEG;
+    accelRoll = atan2(accel_x, accel_z) * RAD_TO_DEG;
+    accelYaw = atan2(accel_x, accel_y) * RAD_TO_DEG;
+
+    data.pitch = (tau)*(data.pitch + rotation_x*dt) + (1-tau)*(accelPitch);
+    data.roll = (tau)*(data.roll - rotation_y*dt) + (1-tau)*(accelRoll);
+    // data.yaw = (tau)*(data.yaw + rotation_z*dt) + (1-tau)*(accelYaw);
+    data.yaw = gyroYaw;
+
+    if (data.yaw < 0) data.yaw += 360.0;
+    if (data.yaw >= 360.0) data.yaw -= 360.0;
+
+    gyroPitch += rotation_x*dt;
+    gyroRoll -= rotation_y*dt;
+    gyroYaw += rotation_z*dt;
 }
 
 /**
@@ -77,146 +75,45 @@ IMUData IMU::getIMUData() {
     return data;
 }
 
-void IMU::getMPUScaled() {
-    float temp[3];
-    int i;
-    accelgyro.getMotion9(&ax, &ay, &az, &gx, &gy, &gz, &mx, &my, &mz);
+void IMU::setup_mpu_6050_registers() {
+  //Activate the MPU-6050
+  Wire.beginTransmission(0x68);
+  Wire.write(0x6B);
+  Wire.write(0x00);
+  Wire.endTransmission();
 
-    Gxyz[0] = ((float) gx - G_off[0]) * gscale; //250 LSB(d/s) default to radians/s
-    Gxyz[1] = ((float) gy - G_off[1]) * gscale;
-    Gxyz[2] = ((float) gz - G_off[2]) * gscale;
+  // Configure the accelerometer
+  // Wire.write(0x__);
+  // Wire.write; 2g --> 0x00, 4g --> 0x08, 8g --> 0x10, 16g --> 0x18
+  Wire.beginTransmission(0x68);
+  Wire.write(0x1C);
+  Wire.write(0x08);
+  Wire.endTransmission();
 
-    Axyz[0] = (float) ax;
-    Axyz[1] = (float) ay;
-    Axyz[2] = (float) az;
-    //apply offsets (bias) and scale factors from Magneto
-    for (i = 0; i < 3; i++) temp[i] = (Axyz[i] - A_B[i]);
-    Axyz[0] = A_Ainv[0][0] * temp[0] + A_Ainv[0][1] * temp[1] + A_Ainv[0][2] * temp[2];
-    Axyz[1] = A_Ainv[1][0] * temp[0] + A_Ainv[1][1] * temp[1] + A_Ainv[1][2] * temp[2];
-    Axyz[2] = A_Ainv[2][0] * temp[0] + A_Ainv[2][1] * temp[1] + A_Ainv[2][2] * temp[2];
-    vectorNormalize(Axyz);
-
-    Mxyz[0] = (float) mx;
-    Mxyz[1] = (float) my;
-    Mxyz[2] = (float) mz;
-    //apply offsets and scale factors from Magneto
-    for (i = 0; i < 3; i++) temp[i] = (Mxyz[i] - M_B[i]);
-    Mxyz[0] = M_Ainv[0][0] * temp[0] + M_Ainv[0][1] * temp[1] + M_Ainv[0][2] * temp[2];
-    Mxyz[1] = M_Ainv[1][0] * temp[0] + M_Ainv[1][1] * temp[1] + M_Ainv[1][2] * temp[2];
-    Mxyz[2] = M_Ainv[2][0] * temp[0] + M_Ainv[2][1] * temp[1] + M_Ainv[2][2] * temp[2];
-    vectorNormalize(Mxyz);
+  // Configure the gyro
+  // Wire.write(0x__);
+  // 250 deg/s --> 0x00, 500 deg/s --> 0x08, 1000 deg/s --> 0x10, 2000 deg/s --> 0x18
+  Wire.beginTransmission(0x68);
+  Wire.write(0x1B);
+  Wire.write(0x08);
+  Wire.endTransmission();
 }
 
-// Mahony orientation filter, assumed World Frame NWU (xNorth, yWest, zUp)
-// Modified from Madgwick version to remove Z component of magnetometer:
-// reference vectors are Up (Acc) and West (Acc cross Mag)
-// sjr 12/2020
-// input vectors ax, ay, az and mx, my, mz MUST be normalized!
-// gx, gy, gz must be in units of radians/second
-void IMU::mahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float deltat) {
-    // Vector to hold integral error for Mahony method
-    static float eInt[3] = {0.0, 0.0, 0.0};
-    static unsigned long start = 0;
-    static char first = 1;
+void IMU::read_mpu_6050_data() {
+  // Subroutine for reading the raw data
+  Wire.beginTransmission(0x68);
+  Wire.write(0x3B);
+  Wire.endTransmission();
+  Wire.requestFrom(0x68, 14);
 
-    // short name local variable for readability
-    float q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3];
-    float norm;
-    float hx, hy, hz;  //observed West vector W = AxM
-    float ux, uy, uz, wx, wy, wz; //calculated A (Up) and W in body frame
-    float ex, ey, ez;
-    float pa, pb, pc;
-
-    // Auxiliary variables to avoid repeated arithmetic
-    float q1q1 = q1 * q1;
-    float q1q2 = q1 * q2;
-    float q1q3 = q1 * q3;
-    float q1q4 = q1 * q4;
-    float q2q2 = q2 * q2;
-    float q2q3 = q2 * q3;
-    float q2q4 = q2 * q4;
-    float q3q3 = q3 * q3;
-    float q3q4 = q3 * q4;
-    float q4q4 = q4 * q4;
-
-    // Measured horizon vector = a x m (in body frame)
-    hx = ay * mz - az * my;
-    hy = az * mx - ax * mz;
-    hz = ax * my - ay * mx;
-    // Normalise horizon vector
-    norm = sqrt(hx * hx + hy * hy + hz * hz);
-    if (norm == 0.0f) return; // Handle div by zero
-
-    norm = 1.0f / norm;
-    hx *= norm;
-    hy *= norm;
-    hz *= norm;
-
-    // Estimated direction of Up reference vector
-    ux = 2.0f * (q2q4 - q1q3);
-    uy = 2.0f * (q1q2 + q3q4);
-    uz = q1q1 - q2q2 - q3q3 + q4q4;
-
-    // estimated direction of horizon (West) reference vector
-    wx = 2.0f * (q2q3 + q1q4);
-    wy = q1q1 - q2q2 + q3q3 - q4q4;
-    wz = 2.0f * (q3q4 - q1q2);
-
-    // Error is cross product between estimated direction and measured direction of the reference vectors
-
-    ex = (ay * uz - az * uy) + (hy * wz - hz * wy);
-    ey = (az * ux - ax * uz) + (hz * wx - hx * wz);
-    ez = (ax * uy - ay * ux) + (hx * wy - hy * wx);
-
-    if (Ki > 0.0f) {
-        eInt[0] += ex;      // accumulate integral error
-        eInt[1] += ey;
-        eInt[2] += ez;
-        // Apply I feedback
-        gx += Ki * eInt[0];
-        gy += Ki * eInt[1];
-        gz += Ki * eInt[2];
-    }
-
-    // Apply P feedback
-    gx = gx + Kp * ex;
-    gy = gy + Kp * ey;
-    gz = gz + Kp * ez;
-
-    //update quaternion with integrated contribution
-    // small correction 1/11/2022, see https://github.com/kriswiner/MPU9250/issues/447
-    gx = gx * (0.5*deltat); // pre-multiply common factors
-    gy = gy * (0.5*deltat);
-    gz = gz * (0.5*deltat);
-    float qa = q1;
-    float qb = q2;
-    float qc = q3;
-    q1 += (-qb * gx - qc * gy - q4 * gz);
-    q2 += (qa * gx + qc * gz - q4 * gy);
-    q3 += (qa * gy - qb * gz + q4 * gx);
-    q4 += (qa * gz + qb * gy - qc * gx);
-
-    // Normalise quaternion
-    norm = sqrt(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4);
-    norm = 1.0f / norm;
-    q[0] = q1 * norm;
-    q[1] = q2 * norm;
-    q[2] = q3 * norm;
-    q[3] = q4 * norm;
+  // Read data --> Temperature falls between acc and gyro registers
+  acc_x = Wire.read() << 8 | Wire.read();
+  acc_y = Wire.read() << 8 | Wire.read();
+  acc_z = Wire.read() << 8 | Wire.read();
+  temperature = Wire.read() <<8 | Wire.read();
+  gyro_x = Wire.read()<<8 | Wire.read();
+  gyro_y = Wire.read()<<8 | Wire.read();
+  gyro_z = Wire.read()<<8 | Wire.read();
 }
-
-float IMU::vectorDot(float a[3], float b[3])
-{
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-void IMU::vectorNormalize(float a[3])
-{
-  float mag = sqrt(vectorDot(a, a));
-  a[0] /= mag;
-  a[1] /= mag;
-  a[2] /= mag;
-}
-
 
 
