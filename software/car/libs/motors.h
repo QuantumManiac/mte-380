@@ -20,22 +20,22 @@ A and B must be opposite logic levels (e.g. if IN_A is HIGH, IN_B is LOW). Swap 
 #define FL_IN_B_PIN 49
 // Back-left motor
 #define BL_ENABLE_PIN 9 
-#define BL_IN_A_PIN 3
-#define BL_IN_B_PIN 2
+#define BL_IN_A_PIN 28
+#define BL_IN_B_PIN 29
 // Front-right motor
 #define FR_ENABLE_PIN 10  
-#define FR_IN_A_PIN 4
-#define FR_IN_B_PIN 5
+#define FR_IN_A_PIN 33
+#define FR_IN_B_PIN 32
 // Back-right motor
 #define BR_ENABLE_PIN 11
-#define BR_IN_A_PIN 7
-#define BR_IN_B_PIN 6
+#define BR_IN_A_PIN 34
+#define BR_IN_B_PIN 35
 
 ////////////
 // Config //
 ////////////
 
-#define UNSAFE_PWM false    // Set true to use the max possible PWM value
+#define UNSAFE_PWM true    // Set true to use the max possible PWM value
 #define MAX_PWM 255         // Maxiumum possible PWM value
 #define MAX_SAFE_PWM 200    // Maxiumum "safe" PWM value. Going over this value will most likely overdrive the motors
 
