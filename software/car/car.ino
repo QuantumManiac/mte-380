@@ -20,25 +20,25 @@ void setup()
     ultrasonic.initialize();
     motors.initialize();
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
-    Serial.println("Waiting for start button press.");
-    while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
-    Serial.println("Start button pressed");
-    delay(5000); // When start button is pressed, wait 5 secs before starting
-    goForward();
+    // delay(3000);
+    // imu.setZeroes(true, false, false);
+    // turn();
 }
 
 void loop()
-{
+{   
+
     imu.updateIMUState();
     if (millis() - lastSensorPrint > 1000) {
         lastSensorPrint = millis();
         printSensorData();
     }
 
-    // processCommand();  
+    // if (imu.getIMUData().yaw > 90 && imu.getIMUData().yaw < 180) {
+    //     stop();
+    // }
 
-    if (ultrasonic.getDist() < 10)
-        stop();
+    processCommand();
 }
 
 void printSensorData() {
@@ -57,14 +57,18 @@ void processCommand() {
     if (command != -1) {
         Serial.println(command);
         if (command == 'q') { 
+            motors.setMotorDirection(front_left, forward);
+            motors.setMotorDirection(front_right, backward);
+            motors.setMotorDirection(back_left, forward);
+            motors.setMotorDirection(back_right, backward);
+
             for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorDirection(Motor(i), forward);
                 motors.setMotorPower(Motor(i), 1);
             }
         } else if (command == 'a') {
             for (int i = 0; i < NUM_MOTORS; i++) {
                 motors.setMotorDirection(Motor(i), forward);
-                motors.setMotorPower(Motor(i), 0.5);
+                motors.setMotorPower(Motor(i), 1);
             }
         } else if (command == 'w') {
             for (int i = 0; i < NUM_MOTORS; i++) {
@@ -89,6 +93,17 @@ void goForward() {
             motors.setMotorDirection(Motor(i), forward);
             motors.setMotorPower(Motor(i), 0.5);
         }
+}
+
+void turn() {
+    motors.setMotorDirection(front_left, forward);
+    motors.setMotorDirection(front_right, backward);
+    motors.setMotorDirection(back_left, forward);
+    motors.setMotorDirection(back_right, backward);
+
+    for (int i = 0; i < NUM_MOTORS; i++) {
+        motors.setMotorPower(Motor(i), 1);
+    }
 }
 
 void stop() {
