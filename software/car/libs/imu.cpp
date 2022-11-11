@@ -59,16 +59,23 @@ IMUData IMU::getIMUData() {
   float raw_pitch = imu.pitch;
   float raw_roll = imu.roll;
 
-  float pitch = -(raw_pitch - 360); 
-  
-  // Process roll
-  float roll = raw_roll;
-  if (roll > 180) roll -= 360;
+  float yaw = (raw_yaw + yaw_offset) % 360;
+  float pitch = (raw_pitch + pitch_offset) % 360;
+  float roll = (raw_roll + roll_offset) % 360;
 
-  // Process pitch
-  pitch = raw_pitch - 360;
+  if (yaw < 0) {
+    yaw += 360;
+  }
 
-  IMUData data = {imu.yaw, imu.pitch, imu.roll};
+  if (pitch < 0) {
+    pitch += 360;
+  }
+
+  if (roll < 0) {
+    roll += 360;
+  }
+
+  IMUData data = {yaw, pitch, roll};
   return data;
 }
 
