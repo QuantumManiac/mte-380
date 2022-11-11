@@ -10,13 +10,18 @@ IMU imu;
 Ultrasonic ultrasonic;
 Motors motors;
 
-const int NUMTURNS = 10;
+const int NUMTURNS = 11;
+const float MINDIST = 5;
+const float MAX_PITCH = 10;
 
-float distToTurn[NUMTURNS] = {};
+float distToTurn[NUMTURNS] = {13, 13, 13, 43, 43, 43, 43, 73, 73, 73, 73};
 
 float leftSpeed = 0.9, rightSpeed = 0.9, leftTurn = 0.9, rightTurn = -0.9, adjustment = 0.1;
 
 unsigned long lastSensorPrint = 0;
+float distanceToWall = 0;
+int usState = 0;
+float lastUSValue = 0;
 
 void setup()
 {
@@ -34,8 +39,8 @@ void setup()
 
 void runMotors(float left, float right) {
     // check direction
-    MotorDirection dirLeft = (left < 1 ? backward : forward);
-    MotorDirection dirRight = (right < 1 ? backward : forward);
+    MotorDirection dirLeft = (left < 0 ? backward : forward);
+    MotorDirection dirRight = (right < 0 ? backward : forward);
 
 	//start left motor
 	motors.setMotorDirection(Motor(0), dirLeft);
@@ -47,8 +52,8 @@ void runMotors(float left, float right) {
 	motors.setMotorDirection(Motor(2), dirRight);
 	motors.setMotorPower(Motor(2), abs(right));
     
-	motors.setMotorDirection(Motor(2), dirRight);
-	motors.setMotorPower(Motor(2), abs(right));
+	motors.setMotorDirection(Motor(3), dirRight);
+	motors.setMotorPower(Motor(3), abs(right));
 }
 
 void turn(int turnNum) {
@@ -57,12 +62,15 @@ void turn(int turnNum) {
 		runMotors(leftTurn, rightTurn);
 	}
 
-	while (imu.getIMUData().yaw < 90) {
+	float currentAngle = imu.getIMUData().yaw;
+	while (imu.getIMUData().yaw < (currentAngle + 90)) {
+		imu.updateIMUState();
+        if (millis() - lastSensorPrint > 1000) {
+            lastSensorPrint = millis();
+        }
 	}
 
-	if (imu.getIMUData().yaw > 90) {
-		runMotors(0, 0);
-	}
+	runMotors(0, 0);
 
 }
 
@@ -75,29 +83,76 @@ void adjustWheels(int val) {
 	}
 }
 
+void checkDistance() {
+	if ((usState == 0) && ((lastUSValue - MINDIST) > distanceToWall)) {
+		usState = 1;
+		distanceToWall = lastUSValue;
+	} else if ((usState == 1) && ((lastUSValue - MINDIST) < distanceToWall)) {
+		usState = 0;
+		lastUSValue = ultrasonic.getDist();
+	}
+
+	if ((usState == 0) && ((lastUSValue - MINDIST) < distanceToWall)) {
+		lastUSValue = ultrasonic.getDist();
+	}
+
+	if ((usState == 1) && ((lastUSValue - MINDIST) > distanceToWall)) {
+		distanceToWall = lastUSValue;
+	}
+}
+
 void loop()
 {
     imu.updateIMUState();
     if (millis() - lastSensorPrint > 1000) {
         lastSensorPrint = millis();
+		lastUSValue = ultrasonic.getDist();
         printSensorData();
     }
 
     for (int i = 0; i < NUMTURNS; i ++) {
+		distanceToWall = ultrasonic.getDist();
 		//start motors
 		runMotors(leftSpeed, rightSpeed);
-		while (ultrasonic.getDist() > distToTurn[i]) {
+		while (distanceToWall > distToTurn[i]) {
             imu.updateIMUState();
             if (millis() - lastSensorPrint > 1000) {
                 lastSensorPrint = millis();
             }
+			if (imu.getIMUData().pitch < abs(MAX_PITCH))
+				distanceToWall = ultrasonic.getDist();
+			//checkDistance();
 			//adjustThread.check();
 		}
 		turn(i);
 	}
 }
 
+
 void printSensorData() {
     Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
     Serial.println("Distance: " + String(ultrasonic.getDist()));
 }
+
+/*
+void loop()
+{
+    imu.updateIMUState();
+    if (millis() - lastSensorPrint > 1000) {
+        lastSensorPrint = millis();
+		lastUSValue = ultrasonic.getDist();
+        printSensorData();
+    }
+
+    runMotors(leftSpeed, rightSpeed);
+	while (distanceToWall > distToTurn[i]) {
+            imu.updateIMUState();
+            if (millis() - lastSensorPrint > 1000) {
+                lastSensorPrint = millis();
+            }
+			distanceToWall = ultrasonic.getDist();
+			checkDistance();
+			//adjustThread.check();
+		}
+}
+*/
