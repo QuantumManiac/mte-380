@@ -4,7 +4,7 @@
 #include "libs/motors.cpp"
 #include "libs/ultrasonic.cpp"
 
-#define START_BUTTON_PIN 32
+#define START_BUTTON_PIN 53
 
 IMU imu;
 Ultrasonic ultrasonic;
@@ -12,10 +12,10 @@ Motors motors;
 
 const int NUMTURNS = 11;
 const float MINDIST = 5;
-const float MAX_PITCH = 45;
+const float MAX_PITCH = 30;
 const float MAX_DIFF = 1;
 const float MAX_OVERSHOOT = 40;
-const float TURN_DIST_ADJUST = 1;
+const float TURN_DIST_ADJUST = -2;
 
 float distToTurn[NUMTURNS] = {23, 23, 23, 50, 50, 50, 50, 78, 78, 78, 78};
 
@@ -119,7 +119,7 @@ void adjustWheels(float turnAngle) {
 		} else {
 			runMotors(leftAdjustL, leftAdjustR);
 		}
-		Serial.println("left adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
+		//Serial.println("left adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
 	}
 
 	runMotors(0, 0);
@@ -135,7 +135,7 @@ void adjustWheels(float turnAngle) {
 		} else {
 			runMotors(rightAdjustL, rightAdjustR);
 		}
-		Serial.println("right adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
+		//Serial.println("right adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
 	}
 		
 	runMotors(0, 0);
@@ -180,8 +180,8 @@ void loop()
 
 
 void printSensorData() {
-    Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
-    Serial.println("Distance: " + String(ultrasonic.getDist()));
+    //Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
+    //Serial.println("Distance: " + String(ultrasonic.getDist()));
 }
 
 /*
