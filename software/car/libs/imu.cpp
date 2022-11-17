@@ -19,7 +19,7 @@ void IMU::initialize() {
     imu.begin();
     imu.dmpBegin(DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
               DMP_FEATURE_GYRO_CAL, // Use gyro calibration
-            30); // Set DMP FIFO rate to 30 Hz
+            10); // Set DMP FIFO rate to 10 Hz
 }
 
 /**
@@ -41,25 +41,23 @@ void IMU::updateIMUState() {
 }
 
 void IMU::setZeroes(bool yaw, bool pitch, bool roll) {
-  updateIMUState();
   if (yaw) {
-    yaw_offset = -(imu.yaw);
+    yaw_offset = -imu.yaw;
   }
 
   if (pitch) {
-    pitch_offset = -(imu.pitch);
+    pitch_offset = -imu.pitch;
   }
 
   if (roll) {
-    roll_offset = -(imu.roll);
+    roll_offset = -imu.roll;
   }
 }
 
 IMUData IMU::getIMUData() {
-  updateIMUState();
-  float yaw = imu.yaw + yaw_offset;
-  float pitch = imu.pitch + pitch_offset;
-  float roll = imu.roll + roll_offset;
+  float yaw = imu.yaw;
+  float pitch = imu.pitch;
+  float roll = imu.roll;
 
   if (yaw > 360) {
     yaw -= 360;

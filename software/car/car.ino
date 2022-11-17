@@ -1,8 +1,8 @@
 #include "Wire.h"
 
-#include "libs/imu.cpp"
-#include "libs/motors.cpp"
-#include "libs/ultrasonic.cpp"
+#include "libraries/user/imu.cpp"
+#include "libraries/user/motors.cpp"
+#include "libraries/user/ultrasonic.cpp"
 
 #define START_BUTTON_PIN 53
 
@@ -12,14 +12,14 @@ Motors motors;
 
 const int NUMTURNS = 11;
 const float MINDIST = 5;
-const float MAX_PITCH = 30;
+const float MAX_PITCH = 4;
 const float MAX_DIFF = 1;
 const float MAX_OVERSHOOT = 40;
 const float TURN_DIST_ADJUST = -2;
 
 float distToTurn[NUMTURNS] = {23, 23, 23, 50, 50, 50, 50, 78, 78, 78, 78};
 
-float leftSpeed = 0.8, rightSpeed = 0.8, leftAdjustL = -0.5, leftAdjustR = 0.5, rightAdjustL = 0.5, rightAdjustR = -0.5, rightTurn = -0.8, leftTurn = -0.8;
+float leftSpeed = 0.8, rightSpeed = 0.8, leftAdjustL = -0.6, leftAdjustR = 0.6, rightAdjustL = 0.6, rightAdjustR = -0.6, rightTurn = -0.9, leftTurn = -0.9;
 
 unsigned long lastSensorPrint = 0;
 float distanceToWall = 0;
@@ -33,10 +33,14 @@ void setup()
     imu.initialize();
     ultrasonic.initialize();
     motors.initialize();
+	while (true) {
+		imu.updateIMUState();
+		printSensorData();
+	}
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
-    //Serial.println("Waiting for start button press");
+    Serial.println("Waiting for start button press");
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
-    //Serial.println("Start button pressed");
+    Serial.println("Start button pressed");
     delay(5000); // When start button is pressed, wait 5 secs before starting
 }
 
@@ -90,7 +94,7 @@ void turn(float currentAngle) {
 	// stop motors
 	//runMotors(0, 0);
 
-	float turnAngle = currentAngle + 90;
+	float turnAngle = currentAngle;
 	if (turnAngle >= 360)
 		// simplify turning conditions
 		turnAngle = turnToZero(turnAngle);
@@ -105,27 +109,11 @@ void turn(float currentAngle) {
 }
 
 void adjustWheels(float turnAngle) {
-	// turn left and turn right
-	runMotors(0, 0);
 	
-	// turn left
-	while ((abs(turnAngle - imu.getIMUData().yaw) > MAX_DIFF && (turnAngle < imu.getIMUData().yaw) && (imu.getIMUData().yaw - turnAngle <= 180)) || (turnAngle > imu.getIMUData().yaw && (imu.getIMUData().yaw -360 < -350) && (turnAngle > 340))) {
-		imu.updateIMUState();
-		if (millis() - lastSensorPrint > 1000) {
-			lastSensorPrint = millis();
-		}
-		if (abs(turnAngle - imu.getIMUData().yaw) > 20) {
-			runMotors(leftTurn, rightSpeed);
-		} else {
-			runMotors(leftAdjustL, leftAdjustR);
-		}
-		//Serial.println("left adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
-	}
-
 	runMotors(0, 0);
 	// OR the turn angle + 360 - yaw is greater than the max diff
 	// ex if the turn angle is 20 and yaw is 355, 380, turn right
-	while ((turnAngle > imu.getIMUData().yaw && (abs(turnAngle - imu.getIMUData().yaw) > MAX_DIFF)) && (turnAngle - imu.getIMUData().yaw < 180) || (turnAngle < imu.getIMUData().yaw && (imu.getIMUData().yaw - 360 > -10))) {
+	while ((turnAngle > imu.getIMUData().yaw && (abs(turnAngle - imu.getIMUData().yaw) > MAX_DIFF)) && (turnAngle - imu.getIMUData().yaw < 180) || (turnAngle < imu.getIMUData().yaw && (imu.getIMUData().yaw - 360 > -20))) {
 		imu.updateIMUState();
 		if (millis() - lastSensorPrint > 1000) {
 			lastSensorPrint = millis();
@@ -135,7 +123,23 @@ void adjustWheels(float turnAngle) {
 		} else {
 			runMotors(rightAdjustL, rightAdjustR);
 		}
-		//Serial.println("right adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
+		Serial.println(String(millis()) + " right adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
+	}
+	// turn left and turn right
+	runMotors(0, 0);
+	
+	// turn left
+	while ((abs(turnAngle - imu.getIMUData().yaw) > MAX_DIFF && (turnAngle < imu.getIMUData().yaw) && (imu.getIMUData().yaw - turnAngle <= 180)) || (turnAngle > imu.getIMUData().yaw && (imu.getIMUData().yaw -360 < -340) && (turnAngle > 340))) {
+		imu.updateIMUState();
+		if (millis() - lastSensorPrint > 1000) {
+			lastSensorPrint = millis();
+		}
+		if (abs(turnAngle - imu.getIMUData().yaw) > 20) {
+			runMotors(leftTurn, rightSpeed);
+		} else {
+			runMotors(leftAdjustL, leftAdjustR);
+		}
+		Serial.println(String(millis()) + " left adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
 	}
 		
 	runMotors(0, 0);
@@ -173,36 +177,69 @@ void loop()
 
 			//adjustThread.check();
 		}
-		//Serial.println(i);
-		turn(currentAngle);
+		Serial.println(i);
+		
+		// Increase turn angle by 90 each junction
+		turn((i+1)*90%360);
 	}
 }
 
-
 void printSensorData() {
-    //Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
-    //Serial.println("Distance: " + String(ultrasonic.getDist()));
+    Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
+    Serial.println("Distance: " + String(ultrasonic.getDist()));
+    Serial.println("Time: " + String(millis()));
 }
 
 /*
-void loop()
-{
-    imu.updateIMUState();
-    if (millis() - lastSensorPrint > 1000) {
-        lastSensorPrint = millis();
-		lastUSValue = ultrasonic.getDist();
-        printSensorData();
-    }
+// pid implementation
 
-    runMotors(leftSpeed, rightSpeed);
-	while (distanceToWall > distToTurn[i]) {
-            imu.updateIMUState();
-            if (millis() - lastSensorPrint > 1000) {
-                lastSensorPrint = millis();
-            }
-			distanceToWall = ultrasonic.getDist();
-			checkDistance();
-			//adjustThread.check();
+
+//PID constants
+double kp = 2;
+double ki = 5;
+double kd = 1;
+ 
+unsigned long currentTime, previousTime;
+double elapsedTime;
+double error;
+double lastError;
+double input, output, setPoint;
+double cumError, rateError;
+double setPoint;
+ 
+void setup(){
+}    
+ 
+void loop(){
+		setPoint = 0; // change setPoint to equal 0, 90, 180, 270
+        input = imu.getIMUDate().yaw;                //read from rotary encoder connected to A0
+        output = computePID(setPoint, input);
+        delay(100);
+        analogWrite(3, output);                //control the motor based on PID value
+ 
+}
+ 
+double computePID(double setPoint, double inp){     
+        currentTime = millis();                //get current time
+        elapsedTime = (double)(currentTime - previousTime);        //compute time elapsed from previous computation
+        
+		if (setPoint < inp && inp > 180 && setPoint < 180) {
+			error = inp - setPoint - 360;
+		} else if (inp < setPoint && inp < 180 && setPoint > 180) {
+			error = 360 - setPoint + inp;
+		} else {
+			error = setPoint - inp; // determine error
 		}
+        cumError += error * elapsedTime;                // compute integral
+        rateError = (error - lastError)/elapsedTime;   // compute derivative
+ 
+        double out = kp*error + ki*cumError + kd*rateError;                //PID output               
+ 
+        lastError = error;                                //remember current error
+        previousTime = currentTime;                        //remember current time
+
+		out = map(out, 0, 360, -1, 1);
+ 
+        return out;                                        //have function return the PID output
 }
 */
