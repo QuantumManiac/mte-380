@@ -1,10 +1,11 @@
 #include "Wire.h"
 
-#include "libs/imu.cpp"
-#include "libs/motors.cpp"
-#include "libs/ultrasonic.cpp"
+#include "libraries/user/imu.cpp"
+#include "libraries/user/motors.cpp"
+#include "libraries/user/ultrasonic.cpp"
 
 #define START_BUTTON_PIN 53
+#define SERIAL_LOGGING true
 
 IMU imu;
 Ultrasonic ultrasonic;
@@ -32,9 +33,15 @@ void setup()
     motors.initialize();
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
     Serial.println("Waiting for start button press");
-    while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
-    Serial.println("Start button pressed");
-    delay(5000); // When start button is pressed, wait 5 secs before starting
+    while (digitalRead(START_BUTTON_PIN) == HIGH) {
+		imu.updateIMUState();
+	} // Wait until start button is pressed
+	Serial.println("Start button pressed");
+	imu.setZeroes(true, true, true);
+	for (int i = 0; i < NUM_MOTORS; i++) {
+		motors.setMotorDirection(Motor(i), forward);
+		motors.setMotorPower(Motor(i), 1);
+	}
 }
 
 void runMotors(float left, float right) {
@@ -66,6 +73,7 @@ void turn(int turnNum) {
 	float currentAngle = imu.getIMUData().yaw;
 	while (imu.getIMUData().yaw < (currentAngle + 90)) {
 		imu.updateIMUState();
+        printSensorData();
         if (millis() - lastSensorPrint > 1000) {
             lastSensorPrint = millis();
         }
@@ -104,40 +112,15 @@ void checkDistance() {
 
 void loop()
 {
-    imu.updateIMUState();
-    if (millis() - lastSensorPrint > 1000) {
-        lastSensorPrint = millis();
-		lastUSValue = ultrasonic.getDist();
-        printSensorData();
-    }
-
-	delay(10000);
-
-	imu.setZeroes(true, true, true);
-
-    for (int i = 0; i < NUMTURNS; i ++) {
-		distanceToWall = ultrasonic.getDist();
-		//start motors
-		runMotors(leftSpeed, rightSpeed);
-		while (distanceToWall > distToTurn[i]) {
-            imu.updateIMUState();
-            if (millis() - lastSensorPrint > 1000) {
-                lastSensorPrint = millis();
-            }
-			if (imu.getIMUData().pitch < abs(MAX_PITCH)) {
-				distanceToWall = ultrasonic.getDist();
-			}
-			//checkDistance();
-			//adjustThread.check();
-		}
-		turn(i);
-	}
+   
 }
 
 
 void printSensorData() {
-    Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
-    Serial.println("Distance: " + String(ultrasonic.getDist()));
+    #if SERIAL_LOGGING
+        Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
+        Serial.println("Distance: " + String(ultrasonic.getDist()));
+    #endif
 }
 
 /*

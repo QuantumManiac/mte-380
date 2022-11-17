@@ -41,23 +41,25 @@ void IMU::updateIMUState() {
 }
 
 void IMU::setZeroes(bool yaw, bool pitch, bool roll) {
+  updateIMUState();
   if (yaw) {
-    yaw_offset = -imu.yaw;
+    yaw_offset = -(imu.yaw);
   }
 
   if (pitch) {
-    pitch_offset = -imu.pitch;
+    pitch_offset = -(imu.pitch);
   }
 
   if (roll) {
-    roll_offset = -imu.roll;
+    roll_offset = -(imu.roll);
   }
 }
 
 IMUData IMU::getIMUData() {
-  float yaw = imu.yaw;
-  float pitch = imu.pitch;
-  float roll = imu.roll;
+  updateIMUState();
+  float yaw = imu.yaw + yaw_offset;
+  float pitch = imu.pitch + pitch_offset;
+  float roll = imu.roll + roll_offset;
 
   if (yaw > 360) {
     yaw -= 360;
