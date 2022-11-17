@@ -19,12 +19,6 @@ void setup()
     imu.initialize();
     ultrasonic.initialize();
     motors.initialize();
-    pinMode(START_BUTTON_PIN, INPUT_PULLUP);
-    Serial.println("Waiting for start button press.");
-    while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
-    Serial.println("Start button pressed");
-    delay(5000); // When start button is pressed, wait 5 secs before starting
-    goForward();
 }
 
 void loop()
@@ -35,10 +29,8 @@ void loop()
         printSensorData();
     }
 
-    // processCommand();  
+    processCommand();  
 
-    if (ultrasonic.getDist() < 10)
-        stop();
 }
 
 void printSensorData() {
@@ -56,10 +48,14 @@ void processCommand() {
 
     if (command != -1) {
         Serial.println(command);
+        delay(5000);
         if (command == 'q') { 
+            motors.setMotorDirection(front_left, forward);
+            motors.setMotorDirection(back_left, forward);
+            motors.setMotorDirection(front_right, backward);
+            motors.setMotorDirection(back_right, backward);
             for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorDirection(Motor(i), forward);
-                motors.setMotorPower(Motor(i), 1);
+                motors.setMotorPower(Motor(i), 0.75);
             }
         } else if (command == 'a') {
             for (int i = 0; i < NUM_MOTORS; i++) {
