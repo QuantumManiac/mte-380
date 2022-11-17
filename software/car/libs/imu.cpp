@@ -15,8 +15,13 @@ IMU::IMU() {
 void IMU::initialize() {
     while (!Serial); // wait for connection
     // verify connection
+<<<<<<< HEAD
     //Serial.println(imu.begin() == INV_SUCCESS ? "MPU9250 OK" : "MPU9250 ERROR");
     imu.begin();
+=======
+    Serial.println(imu.begin() == INV_SUCCESS ? "MPU9250 OK" : "MPU9250 ERROR");
+
+>>>>>>> main
     imu.dmpBegin(DMP_FEATURE_6X_LP_QUAT | // Enable 6-axis quat
               DMP_FEATURE_GYRO_CAL, // Use gyro calibration
             10); // Set DMP FIFO rate to 10 Hz
