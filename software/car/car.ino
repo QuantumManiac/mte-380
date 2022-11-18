@@ -256,6 +256,7 @@ void setup()
     imu.initialize();
     ultrasonic.initialize();
     motors.initialize();
+<<<<<<< HEAD
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
     Serial.println("Waiting for start button press");
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
@@ -280,6 +281,8 @@ void setup()
     
 	motors.setMotorDirection(Motor(3), dirRight);
 	motors.setMotorPower(Motor(3), abs(right));
+=======
+>>>>>>> main
 }
 
 void loop(){
@@ -323,6 +326,7 @@ double computePIDTurn(double setPoint, double inp){
 	cumError += errorTurn * elapsedTimeTurn;                // compute integral
 	rateError = (errorTurn - lastErrorTurn)/elapsedTimeTurn;   // compute derivative
 
+<<<<<<< HEAD
 	double out = kp*errorTurn + ki*cumError + kd*rateError;                //PID output               
 
 	lastErrorTurn = errorTurn;                                //remember current error
@@ -331,6 +335,10 @@ double computePIDTurn(double setPoint, double inp){
 	out = map(out, -360, 360, -1, 1);
 
 	return out;                                        //have function return the PID output
+=======
+    processCommand();  
+
+>>>>>>> main
 }
 
 float computePIDStop(float setPoint, float inp) {
@@ -351,4 +359,61 @@ float computePIDStop(float setPoint, float inp) {
 	return out;  
 }
 
+<<<<<<< HEAD
 */
+=======
+void processCommand() {
+    char command = Serial.read();
+    // q - forward max
+    // a - forward half
+    // w - backward max
+    // s - backward half
+    // x - stop
+
+    if (command != -1) {
+        Serial.println(command);
+        delay(5000);
+        if (command == 'q') { 
+            motors.setMotorDirection(front_left, forward);
+            motors.setMotorDirection(back_left, forward);
+            motors.setMotorDirection(front_right, backward);
+            motors.setMotorDirection(back_right, backward);
+            for (int i = 0; i < NUM_MOTORS; i++) {
+                motors.setMotorPower(Motor(i), 0.75);
+            }
+        } else if (command == 'a') {
+            for (int i = 0; i < NUM_MOTORS; i++) {
+                motors.setMotorDirection(Motor(i), forward);
+                motors.setMotorPower(Motor(i), 0.5);
+            }
+        } else if (command == 'w') {
+            for (int i = 0; i < NUM_MOTORS; i++) {
+                motors.setMotorDirection(Motor(i), backward);
+                motors.setMotorPower(Motor(i), 1);
+            }
+        } else if (command == 's') {
+            for (int i = 0; i < NUM_MOTORS; i++) {
+                motors.setMotorDirection(Motor(i), backward);
+                motors.setMotorPower(Motor(i), 0.5);
+            }
+        } else if (command == 'x') {
+            for (int i = 0; i < NUM_MOTORS; i++) {
+                motors.setMotorPower(Motor(i), 0);
+            }
+        }
+    }
+}
+
+void goForward() {
+            for (int i = 0; i < NUM_MOTORS; i++) {
+            motors.setMotorDirection(Motor(i), forward);
+            motors.setMotorPower(Motor(i), 0.5);
+        }
+}
+
+void stop() {
+            for (int i = 0; i < NUM_MOTORS; i++) {
+            motors.setMotorPower(Motor(i), 0);
+        }
+}
+>>>>>>> main
