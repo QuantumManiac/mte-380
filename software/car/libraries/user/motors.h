@@ -76,6 +76,10 @@ class Motors {
         void setMotorPower(Motor motor, float power);
 
         void setMotorDirection(Motor motor, MotorDirection direction);
+
+        void brakeMotor(Motor motor);
+
+        void brakeAllMotors();
 };
 
 #endif
