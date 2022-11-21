@@ -80,8 +80,6 @@ class Motors {
         void brakeMotor(Motor motor);
 
         void brakeAllMotors();
-
-        int motor_pwm_values[NUM_MOTORS] = { 0 };
 };
 
 #endif
