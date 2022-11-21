@@ -1,8 +1,11 @@
 {
     "board": "arduino:avr:mega",
-    "port": "/dev/ttyACM0",
+    "port": "COM4",
     "sketch": "car/car.ino",
     "buildPreferences": [
-        ["sketchbook.path", "./car/"]
+        [
+            "sketchbook.path",
+            "./car/"
+        ]
     ]
 }

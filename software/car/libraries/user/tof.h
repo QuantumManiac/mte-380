@@ -14,7 +14,9 @@ class ToF {
 
         float getDist();
     private:
+        Adafruit_VL53L0X lox;
         float lastVal;
+
 };
 
 #endif

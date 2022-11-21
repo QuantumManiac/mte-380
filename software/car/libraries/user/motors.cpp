@@ -9,7 +9,7 @@ Motors::Motors() {
  * 
  */
 void Motors::initialize() {
-
+    int motor_pwm_values[NUM_MOTORS] = { 0 };
 }
 
 /**
@@ -36,4 +36,27 @@ void Motors::setMotorDirection(Motor motor, MotorDirection direction) {
  */
 void Motors::setMotorPower(Motor motor, float power) {
     analogWrite(ENABLE_PINS[motor], int(power * MOTOR_PWM_LIMIT));
+    motor_pwm_values[motor] = int(power * MOTOR_PWM_LIMIT);
+}
+
+/**
+ * @brief Brakes given motor
+ * 
+ * @param motor the motor to brake
+ */
+void Motors::brakeMotor(Motor motor) {
+    analogWrite(ENABLE_PINS[motor], 255);
+    digitalWrite(IN_A_PINS[motor], LOW);
+    digitalWrite(IN_B_PINS[motor], LOW);
+    motor_pwm_values[motor] = 255;
+}
+
+/**
+ * @brief Brakes all motors
+ * 
+ */
+void Motors::brakeAllMotors() {
+    for (int i = 0; i < NUM_MOTORS; i++) {
+        brakeMotor((Motor)i);
+    }
 }

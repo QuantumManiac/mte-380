@@ -1,8 +1,8 @@
 #include "tof.h"
 
 ToF::ToF() {
-    Adafruit_VL53L0X lox = Adafruit_VL53L0X();
-    float lastVal = -1.;
+    Adafruit_VL53L0X lox;
+    float lastVal = 10000.;
 }
 
 /**
@@ -10,8 +10,7 @@ ToF::ToF() {
  * 
  */
 void ToF::initialize() {
-    lox.startRangeContinuous();
-    Serial.println("ToF Init");
+        Serial.println(lox.begin() ? "VL53L0X OK" : "VL53L0X ERROR");
 }
 
 /**
@@ -20,15 +19,12 @@ void ToF::initialize() {
  * @return float distance in cm
  */
 float ToF::getDist() {
-    float distance = lastVal;
-    uint16_t measurement;
-    
-    if (lox.isRangeComplete()) {
-        measurement = lox.readRange();
-        if (measurement != 0xffff) {
-            distance = lastVal = (measurement / 10);
-        }
+    float distance = -1;
+    VL53L0X_RangingMeasurementData_t measurement;
+    lox.rangingTest(&measurement, false);
+    if (measurement.RangeStatus != 4) { // Phase failures have incorrect data
+        distance = lastVal = (measurement.RangeMilliMeter / 10.);
     }
-
+    
     return distance;
 }

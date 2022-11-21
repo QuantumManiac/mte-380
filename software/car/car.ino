@@ -2,28 +2,42 @@
 
 #include "libraries/user/imu.cpp"
 #include "libraries/user/motors.cpp"
-#include "libraries/user/ultrasonic.cpp"
+#include "libraries/user/tof.cpp"
 
 #define START_BUTTON_PIN 53
 #define TEST_DRIVE 0
 #define TEST_TURN 0
-#define TEST_SPEED 1
+#define TEST_SPEED 0
 
 IMU imu;
-Ultrasonic ultrasonic;
+ToF tof;
 Motors motors;
+
+//PID constants
+double kp = 10;
+double ki = 0;
+double kd = 1000;
+ 
+unsigned long currentTime, previousTimeTurn, previousTimeStop;
+double elapsedTimeTurn, elapsedTimeStop;
+double errorTurn, errorStop;
+double lastErrorTurn, lastErrorStop;
+double input, output, setPoint;
+double cumError, rateError;
+float currentMotorSpeedL, currentMotorSpeedR;
+float MAX_SPEED = 1, MIN_SPEED = -1;
 
 const int NUMTURNS = 11;
 const float MINDIST = 5;
 const float MAX_PITCH = 4;
 const float MAX_DIFF = 1;
 const float MAX_OVERSHOOT = 40;
-const float TURN_DIST_ADJUST = -2.2;
+const float TURN_DIST_ADJUST = 2;
 
 float distToTurn[NUMTURNS] = {23, 23, 23, 50, 50, 50, 50, 78, 78, 78, 78};
 
 //  change back to 0.8 after
-float leftSpeed = 0.8, rightSpeed = 0.8, leftAdjustL = -0.6, leftAdjustR = 0.6, rightAdjustL = 0.6, rightAdjustR = -0.6, rightTurn = -0.9, leftTurn = -0.9;
+float leftSpeed = 0.8, rightSpeed = 0.8, leftAdjustL = -0.6, leftAdjustR = 0.6, rightAdjustL = 0.6, rightAdjustR = -0.6, rightTurn = -0.8, leftTurn = -0.8;
 
 unsigned long lastSensorPrint = 0;
 float distanceToWall = 0;
@@ -34,14 +48,16 @@ float lastUSValue = 0;
 void setup()
 {
     Wire.begin();
-    //Serial.begin(115200);
+    Serial.begin(115200);
     imu.initialize();
-    ultrasonic.initialize();
+	//Serial.println("Init");
+    tof.initialize();
+	//Serial.println("Init Done");
     motors.initialize();
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
-    //Serial.println("Waiting for start button press");
+    Serial.println("Waiting for start button press");
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
-    //Serial.println("Start button pressed");
+    Serial.println("Start button pressed");
     // delay(5000); // When start button is pressed, wait 5 secs before starting
 }
 
@@ -104,17 +120,33 @@ void turn(float currentAngle) {
 	while (abs(turnAngle - imu.getIMUData().yaw) > MAX_DIFF || millis() - currentTime < 2500) { // TODO: MAKE THE 1 A CONSTANT
 		
 		imu.updateIMUState();
-		if (millis() - lastSensorPrint > 1000) {
+
+		//adjustWheels(turnAngle);
+		float turning = computePIDTurn(turnAngle, imu.getIMUData().yaw);
+		if (turning > 1) {
+			runMotors(1, -1);
+		} else if (turning < -1) {
+			runMotors(-1, 1);
+		} else {
+			runMotors(turning, turning*-1);
+		} 
+		if (millis() - lastSensorPrint > 200) {
 			lastSensorPrint = millis();
+			Serial.println(String(millis()) + " adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
+			Serial.println("Motor speeds: left | right: " + String(motors.motor_pwm_values[front_left]) + " | " + String(motors.motor_pwm_values[front_right]));
+			Serial.println("PID Value: " + String(turning));
 		}
-		adjustWheels(turnAngle);
 	}
+	motors.brakeAllMotors();
+
 	//Serial.println(String(millis() - currentTime));
 }
 
 void adjustWheels(float turnAngle) {
 	
-	runMotors(0, 0);
+	//runMotors(0, 0);
+	motors.brakeAllMotors();
+
 	// OR the turn angle + 360 - yaw is greater than the max diff
 	// ex if the turn angle is 20 and yaw is 355, 380, turn right
 	while ((turnAngle > imu.getIMUData().yaw && (abs(turnAngle - imu.getIMUData().yaw) > MAX_DIFF)) && (turnAngle - imu.getIMUData().yaw < 180) || (turnAngle < imu.getIMUData().yaw && (imu.getIMUData().yaw - 360 > -20))) {
@@ -125,12 +157,13 @@ void adjustWheels(float turnAngle) {
 		if (abs(turnAngle - imu.getIMUData().yaw) > 20) {
 			runMotors(0.7, -0.7);
 		} else {
-			runMotors(0.5, -0.5);
+			runMotors(0.4, -0.4);
 		}
 		//Serial.println(String(millis()) + " right adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
 	}
 	// turn left and turn right
-	runMotors(0, 0);
+	//runMotors(0, 0);
+	motors.brakeAllMotors();
 	
 	// turn left
 	while ((abs(turnAngle - imu.getIMUData().yaw) > MAX_DIFF && (turnAngle < imu.getIMUData().yaw) && (imu.getIMUData().yaw - turnAngle <= 180)) || (turnAngle > imu.getIMUData().yaw && (imu.getIMUData().yaw -360 < -340) && (turnAngle > 340))) {
@@ -141,12 +174,48 @@ void adjustWheels(float turnAngle) {
 		if (abs(turnAngle - imu.getIMUData().yaw) > 20) {
 			runMotors(-0.7, 0.7);
 		} else {
-			runMotors(-0.5, 0.5);
+			runMotors(-0.4, 0.4);
 		}
 		//Serial.println(String(millis()) + " left adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
 	}
 		
-	runMotors(0, 0);
+	//runMotors(0, 0);
+	motors.brakeAllMotors();
+	printSensorData();
+}
+
+float computePIDTurn(double setPoint, double inp){     
+	currentTime = millis();                //get current time
+	// generally 4-10 ms
+	elapsedTimeTurn = (double)(currentTime - previousTimeTurn);        //compute time elapsed from previous computation
+	
+	if (setPoint < inp && inp > 340 && setPoint < 91) {
+		// should turn right therefore positive error
+		errorTurn = 360 - inp + setPoint;
+	} else if (inp < setPoint && inp < 20 && setPoint > 269) {
+		// should turn left therefore negative error
+		errorTurn = setPoint + inp - 360;
+	} else {
+		errorTurn = setPoint - inp; // determine error
+	}
+	cumError += errorTurn * elapsedTimeTurn;                // compute integral
+	Serial.println("Elapsed Time: " + String(elapsedTimeTurn));
+	rateError = (errorTurn - lastErrorTurn)/elapsedTimeTurn;   // compute derivative
+
+	double out = kp*errorTurn + ki*cumError + kd*rateError;                //PID output      
+	if (out < -360) {
+		out = -360;
+	} else if (out > 360) {
+		out = 360;
+	}
+
+	lastErrorTurn = errorTurn;                                //remember current error
+	previousTimeTurn = currentTime;                        //remember current time
+
+	//out = map(out, -360, 360, -1, 1);
+	out /= 360;
+
+	return out;                                        //have function return the PID output
 }
 
 // MAIN
@@ -155,68 +224,36 @@ void loop()
     imu.updateIMUState();
     if (millis() - lastSensorPrint > 1000) {
         lastSensorPrint = millis();
-		lastUSValue = ultrasonic.getDist();
+		//lastUSValue = tof.getDist();
         printSensorData();
     }
-	
-	#if TEST_TURN 
-	{
-		delay(10000);
-	} 
-	#endif
+
+	delay(10000);
+
 
 	//Serial.println("drive");
 	imu.setZeroes(true, true, true);
 
-	#if TEST_TURN
-		{
-			printSensorData();
-			turn(85);
-			runMotors(0, 0);
-			printSensorData();
-			while(true); // stop after turning
-		}
-	#endif
     for (int i = 0; i < NUMTURNS; i ++) {
 		float currentAngle = imu.getIMUData().yaw;
-		distanceToWall = ultrasonic.getDist();
+		distanceToWall = tof.getDist();
 		//start motors
 		runMotors(leftSpeed, rightSpeed);
 
-		#if TEST_DRIVE
-		
-			runMotors(0, 0);
-			runMotors(0.5, 0.5);// stop after reaching wall
-		
-		#endif
-
-		#if TEST_SPEED
-		{
-			runMotors(0, 0);
-			runMotors(1, 1);// stop after reaching wall
-		}
-		#endif
-
-		while (ultrasonic.getDist() > (distToTurn[i] + TURN_DIST_ADJUST)) {
+		printSensorData();
+		while (tof.getDist() > (distToTurn[i] + TURN_DIST_ADJUST)) {
             imu.updateIMUState();
             if (millis() - lastSensorPrint > 1000) {
                 lastSensorPrint = millis();
 				//printSensorData();
             }
 			if ((abs(imu.getIMUData().pitch - 360) < abs(MAX_PITCH)) || (abs(imu.getIMUData().pitch) < abs(MAX_PITCH))) {
-				distanceToWall = ultrasonic.getDist();
+				distanceToWall = tof.getDist();
 				printSensorData();
 			}
 
 			//adjustThread.check();
-		}
-		//Serial.println(i);
-		#if TEST_DRIVE
-		{
-			runMotors(0, 0);
-			while(true); // stop after reaching wall
-		}
-		#endif
+		} 
 
 		// Increase turn angle by 90 each junction
 		turn((i+1)*90%360);
@@ -226,9 +263,9 @@ void loop()
 
 
 void printSensorData() {
-    //Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
-    //Serial.println("Distance: " + String(ultrasonic.getDist()));
-    //Serial.println("Time: " + String(millis()));
+    Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
+    Serial.println("Distance: " + String(tof.getDist()));
+    Serial.println("Time: " + String(millis()));
 }
 
 /*
@@ -250,13 +287,12 @@ float currentMotorSpeedL, currentMotorSpeedR;
 float MAX_SPEED = 1, MIN_SPEED = -1;
  
 void setup()
-{
+{ 
     Wire.begin();
     Serial.begin(115200);
     imu.initialize();
-    ultrasonic.initialize();
+    tof.initialize();
     motors.initialize();
-<<<<<<< HEAD
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
     Serial.println("Waiting for start button press");
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
@@ -281,8 +317,6 @@ void setup()
     
 	motors.setMotorDirection(Motor(3), dirRight);
 	motors.setMotorPower(Motor(3), abs(right));
-=======
->>>>>>> main
 }
 
 void loop(){
@@ -291,7 +325,7 @@ void loop(){
 	output = computePIDTurn(setPoint, input);
 	runMotors(0.8, 0.8);
 	delay(100);
-	while(ultrasonic.getDist() > 23) {
+	while(tof.getDist() > 23) {
 		input = imu.getIMUData().yaw; 
 		output = computePIDTurn(setPoint, input);
 		if (output > MAX_SPEED) {
@@ -326,7 +360,6 @@ double computePIDTurn(double setPoint, double inp){
 	cumError += errorTurn * elapsedTimeTurn;                // compute integral
 	rateError = (errorTurn - lastErrorTurn)/elapsedTimeTurn;   // compute derivative
 
-<<<<<<< HEAD
 	double out = kp*errorTurn + ki*cumError + kd*rateError;                //PID output               
 
 	lastErrorTurn = errorTurn;                                //remember current error
@@ -335,10 +368,6 @@ double computePIDTurn(double setPoint, double inp){
 	out = map(out, -360, 360, -1, 1);
 
 	return out;                                        //have function return the PID output
-=======
-    processCommand();  
-
->>>>>>> main
 }
 
 float computePIDStop(float setPoint, float inp) {
@@ -359,61 +388,4 @@ float computePIDStop(float setPoint, float inp) {
 	return out;  
 }
 
-<<<<<<< HEAD
 */
-=======
-void processCommand() {
-    char command = Serial.read();
-    // q - forward max
-    // a - forward half
-    // w - backward max
-    // s - backward half
-    // x - stop
-
-    if (command != -1) {
-        Serial.println(command);
-        delay(5000);
-        if (command == 'q') { 
-            motors.setMotorDirection(front_left, forward);
-            motors.setMotorDirection(back_left, forward);
-            motors.setMotorDirection(front_right, backward);
-            motors.setMotorDirection(back_right, backward);
-            for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorPower(Motor(i), 0.75);
-            }
-        } else if (command == 'a') {
-            for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorDirection(Motor(i), forward);
-                motors.setMotorPower(Motor(i), 0.5);
-            }
-        } else if (command == 'w') {
-            for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorDirection(Motor(i), backward);
-                motors.setMotorPower(Motor(i), 1);
-            }
-        } else if (command == 's') {
-            for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorDirection(Motor(i), backward);
-                motors.setMotorPower(Motor(i), 0.5);
-            }
-        } else if (command == 'x') {
-            for (int i = 0; i < NUM_MOTORS; i++) {
-                motors.setMotorPower(Motor(i), 0);
-            }
-        }
-    }
-}
-
-void goForward() {
-            for (int i = 0; i < NUM_MOTORS; i++) {
-            motors.setMotorDirection(Motor(i), forward);
-            motors.setMotorPower(Motor(i), 0.5);
-        }
-}
-
-void stop() {
-            for (int i = 0; i < NUM_MOTORS; i++) {
-            motors.setMotorPower(Motor(i), 0);
-        }
-}
->>>>>>> main
