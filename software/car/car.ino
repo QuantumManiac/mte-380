@@ -67,10 +67,6 @@ void setup()
     turnPID.SetMode(AUTOMATIC); // Enable PIDs
     straightPID.SetMode(AUTOMATIC);
 
-    while (true) {
-        imu.updateIMUState();
-        printSensorData();
-    }
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
     printLineToSerial("Waiting for start button press"); // TODO: This should be in two stages for game day: press start button to go through calibration and/or pre-flight checks and then start again to go through the course
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
