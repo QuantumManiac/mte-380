@@ -8,7 +8,8 @@
 
 #define START_BUTTON_PIN 53
 
-#define SERIAL_LOGGING false    // set to false to prevent potential blocking of code
+#define AUTOTUNING_PROC true
+#define SERIAL_LOGGING true    // set to false to prevent potential blocking of code
 #define CALIBRATE_IMU false    // Enables wait for 10 seconds before starting
 #define PRINT_SENSOR_DATA true // Requires SERIAL_LOGGING to be true
 
@@ -34,10 +35,21 @@ double turnKp = 0.03, turnKi = 0, turnKd = 0.015;
 double straightKp = 10, straightKi = 0, straightKd = 1000;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
-double turnTarget = 0;
+double turnTarget = 90;
 double straightTarget = 0;
 PID turnPID(&turnInput, &turnOutput, &turnTarget, turnKp, turnKi, turnKd, DIRECT);
 PID straightPID(&straightInput, &straightOutput, &straightTarget, straightKp, straightKi, straightKd, DIRECT);
+
+// PID Autotuning-related variables
+float tunerTurnInput, tunerTurnOutput, tunerTurnTarget = 90;
+float tunerTurnKp, tunerTurnKi, tunerTurnKd; 
+
+float tunerTurnInputSpan = 360, tunerTurnOutputSpan = 2; 
+float tunerTurnOutputStart = 0, tunerTurnOutputStep = 90; 
+uint32_t tunerTurnSettleTimeSec = 0, tunerTurnTestTimeSec = 10;
+uint8_t tunerTurnSamples = 300;
+sTune turnTuner(&tunerTurnInput, &tunerTurnOutput, turnTuner.ZN_PID, turnTuner.directIP, turnTuner.printSUMMARY);
+
 
 //  Wheel speed variables
 const float MIN_SPEED = 0.2;
@@ -67,6 +79,9 @@ void setup()
     straightPID.SetOutputLimits(MIN_SPEED, CRUISE_SPEED);
     straightPID.SetMode(AUTOMATIC);
 
+    // Init PD Tuner
+    turnTuner.Configure(tunerTurnInputSpan, tunerTurnOutputSpan, tunerTurnOutputStart, tunerTurnOutputStep, tunerTurnTestTimeSec, tunerTurnSettleTimeSec, tunerTurnSamples);
+
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
     printLineToSerial("Waiting for start button press"); // TODO: This should be in two stages for game day: press start button to go through calibration and/or pre-flight checks and then start again to go through the course
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
@@ -86,6 +101,46 @@ void setup()
 
 void loop()
 {
+#if AUTOTUNING_PROC
+    // Autotuning Code
+    // Minimum turn speed to prevent stalling
+    printLineToSerial(String(tunerTurnInput) + "|" + String() + "|" + String(turnInput) + "|" + String(turnOutput));
+    if (turnOutput > 0 && turnOutput < MIN_TURN_SPEED)
+    {
+        runMotors(MIN_TURN_SPEED, -MIN_TURN_SPEED);
+    }
+    else if (turnOutput < 0 && turnOutput > -MIN_TURN_SPEED)
+    {
+        runMotors(-MIN_TURN_SPEED, MIN_TURN_SPEED);
+    } else {
+        runMotors(turnOutput, -turnOutput);
+    }
+
+    switch (turnTuner.Run()) {
+        case turnTuner.sample: // active once per sample during test
+            imu.updateIMUState();
+            tunerTurnInput = imu.getIMUData().yaw;
+            printLineToSerial("Sample: " + String(tunerTurnInput));
+            break;
+        case turnTuner.tunings: // active just once when sTune is done
+            turnTuner.GetAutoTunings(&tunerTurnKp, &tunerTurnKi, &tunerTurnKd); // sketch variables updated by sTune
+            turnTarget = tunerTurnTarget, turnOutput = tunerTurnOutputStep, turnKp = tunerTurnKp, turnKi = tunerTurnKi, turnKd = tunerTurnKd;
+            tunerTurnOutput = tunerTurnOutputStep;
+            turnPID.SetMode(AUTOMATIC); // the PID is turned on
+            turnPID.SetTunings(turnKp, turnKi, turnKd); // update PID with the new tunings
+            printLineToSerial("Done!");
+            while (true); 
+            break;
+        case turnTuner.runPid: // active once per sample after tunings
+            imu.updateIMUState();
+            tunerTurnInput = imu.getIMUData().yaw;
+            turnInput = tunerTurnInput;
+            turnPID.Compute();
+            printLineToSerial(String(turnInput) + " -> " + String(turnOutput));
+            tunerTurnOutput = turnOutput;
+            break;
+    }
+#else
     // Continue straight to next turn
     runMotors(CRUISE_SPEED, CRUISE_SPEED);
 
@@ -99,8 +154,9 @@ void loop()
             lastSensorPrint = millis();
             printSensorData();
         }
-#endif
+
         adjustWheels(); // This function is empty
+#endif
     }
 
     turnCorner();
@@ -114,6 +170,7 @@ void loop()
         printLineToSerial("Done!");
         while (true);
     }
+#endif
 }
 
 /**
