@@ -14,9 +14,9 @@ ToF tof;
 Motors motors;
 
 //PID constants
-double kp = 10;
+double kp = 1;
 double ki = 0;
-double kd = 1000;
+double kd = 0;
  
 unsigned long currentTime, previousTimeTurn, previousTimeStop;
 double elapsedTimeTurn, elapsedTimeStop;
@@ -54,10 +54,11 @@ void setup()
     tof.initialize();
 	//Serial.println("Init Done");
     motors.initialize();
+
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
-    Serial.println("Waiting for start button press");
+    //Serial.println("Waiting for start button press");
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
-    Serial.println("Start button pressed");
+    //Serial.println("Start button pressed");
     // delay(5000); // When start button is pressed, wait 5 secs before starting
 }
 
@@ -133,13 +134,13 @@ void turn(float currentAngle) {
 		if (millis() - lastSensorPrint > 200) {
 			lastSensorPrint = millis();
 			Serial.println(String(millis()) + " adjust turnAngle: " + String(turnAngle) + " imu yaw: " + String(imu.getIMUData().yaw));
-			Serial.println("Motor speeds: left | right: " + String(motors.motor_pwm_values[front_left]) + " | " + String(motors.motor_pwm_values[front_right]));
+			//Serial.println("Motor speeds: left | right: " + String(motors.motor_pwm_values[front_left]) + " | " + String(motors.motor_pwm_values[front_right]));
 			Serial.println("PID Value: " + String(turning));
 		}
 	}
 	motors.brakeAllMotors();
 
-	//Serial.println(String(millis() - currentTime));
+	Serial.println(String(millis() - currentTime));
 }
 
 void adjustWheels(float turnAngle) {
@@ -199,21 +200,29 @@ float computePIDTurn(double setPoint, double inp){
 		errorTurn = setPoint - inp; // determine error
 	}
 	cumError += errorTurn * elapsedTimeTurn;                // compute integral
-	Serial.println("Elapsed Time: " + String(elapsedTimeTurn));
+	//Serial.println("Cumulative Error: " + String(cumError));
+	//Serial.println("Turn Error: " + String(errorTurn));
 	rateError = (errorTurn - lastErrorTurn)/elapsedTimeTurn;   // compute derivative
 
-	double out = kp*errorTurn + ki*cumError + kd*rateError;                //PID output      
+	double out = kp*errorTurn + ki*cumError + kd*rateError;  
+	//PID output      
 	if (out < -360) {
 		out = -360;
 	} else if (out > 360) {
 		out = 360;
 	}
 
-	lastErrorTurn = errorTurn;                                //remember current error
+	lastErrorTurn = errorTurn;                             //remember current error
 	previousTimeTurn = currentTime;                        //remember current time
 
 	//out = map(out, -360, 360, -1, 1);
+	double minMotorSpeed = 0.4;
 	out /= 360;
+	if (out < minMotorSpeed && out > 0) {
+		out = minMotorSpeed;
+	} else if (out > -minMotorSpeed && out < 0) {
+		out = -minMotorSpeed;
+	}
 
 	return out;                                        //have function return the PID output
 }
@@ -228,7 +237,7 @@ void loop()
         printSensorData();
     }
 
-	delay(10000);
+	//delay(10000);
 
 
 	//Serial.println("drive");
@@ -241,6 +250,7 @@ void loop()
 		runMotors(leftSpeed, rightSpeed);
 
 		printSensorData();
+		/*
 		while (tof.getDist() > (distToTurn[i] + TURN_DIST_ADJUST)) {
             imu.updateIMUState();
             if (millis() - lastSensorPrint > 1000) {
@@ -254,18 +264,20 @@ void loop()
 
 			//adjustThread.check();
 		} 
+		*/
 
 		// Increase turn angle by 90 each junction
 		turn((i+1)*90%360);
+		delay(1000);
 
 	}
 }
 
 
 void printSensorData() {
-    Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
-    Serial.println("Distance: " + String(tof.getDist()));
-    Serial.println("Time: " + String(millis()));
+    //Serial.println("Pitch: " + String(imu.getIMUData().pitch) + " Yaw: " + String(imu.getIMUData().yaw) + " Roll: " + String(imu.getIMUData().roll));
+    //Serial.println("Distance: " + String(tof.getDist()));
+    //Serial.println("Time: " + String(millis()));
 }
 
 /*
