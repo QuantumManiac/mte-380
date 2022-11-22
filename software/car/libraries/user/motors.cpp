@@ -35,7 +35,6 @@ void Motors::setMotorDirection(Motor motor, MotorDirection direction) {
  */
 void Motors::setMotorPower(Motor motor, float power) {
     analogWrite(ENABLE_PINS[motor], int(power * MOTOR_PWM_LIMIT));
-    motor_pwm_values[motor] = int(power * MOTOR_PWM_LIMIT);
 }
 
 /**
