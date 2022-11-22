@@ -12,10 +12,10 @@ class ToF {
 
         void initialize();
 
-        float getDist();
+        int getDist();
     private:
         Adafruit_VL53L0X lox;
-        float lastVal;
+        int lastVal;
 
 };
 

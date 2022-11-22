@@ -1,5 +1,6 @@
 #include "imu.h"
 
+const float FULL_ROTATION = 360.0;
 
 IMU::IMU() {
   MPU9250_DMP imu;
@@ -55,34 +56,45 @@ void IMU::setZeroes(bool yaw, bool pitch, bool roll) {
   }
 }
 
+void IMU::addToOffsets(float yaw, float pitch, float roll) {
+  updateIMUState();
+  yaw_offset += yaw;
+  pitch_offset += pitch;
+  roll_offset += roll;
+}
+
 IMUData IMU::getIMUData() {
   updateIMUState();
-  float yaw = imu.yaw + yaw_offset;
-  float pitch = imu.pitch + pitch_offset;
-  float roll = imu.roll + roll_offset;
+  // Bound heading values to [-360, 360]
+  float yaw = fmod(imu.yaw + yaw_offset, FULL_ROTATION);
+  float pitch = fmod(imu.pitch + pitch_offset, FULL_ROTATION);
+  float roll = fmod(imu.roll + roll_offset, FULL_ROTATION);
 
-  if (yaw > 360) {
-    yaw -= 360;
+  // Bound heading values to [-180, 180]
+  // Map [(180, 360) -> (-180, 0)]
+  if (yaw > 180) {
+    yaw = -(FULL_ROTATION - yaw);
   }
 
-  if (pitch > 360) {
-    pitch -= 360;
+  if (pitch > 180) {
+    pitch = -(FULL_ROTATION - pitch);
   }
 
-  if (roll > 360) {
-    roll -= 360;
+  if (roll > 180) {
+    roll = -(FULL_ROTATION - roll);
   }
 
-  if (yaw < 0) {
-    yaw += 360;
+  // Map [(-360, -180) -> (0, 180)]
+  if (yaw <= -180) {
+    yaw = (FULL_ROTATION + yaw);
   }
 
-  if (pitch < 0) {
-    pitch += 360;
+  if (pitch <= -180) {
+    pitch = (FULL_ROTATION + pitch);
   }
 
-  if (roll < 0) {
-    roll += 360;
+  if (roll <= -180) {
+    roll = (FULL_ROTATION + roll);
   }
 
   IMUData data = {yaw, pitch, roll};

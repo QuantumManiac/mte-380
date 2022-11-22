@@ -30,6 +30,8 @@ class IMU {
 
         void setZeroes(bool yaw, bool pitch, bool roll);
 
+        void addToOffsets(float yaw, float pitch, float roll);
+
         IMUData getIMUData();
 };
 

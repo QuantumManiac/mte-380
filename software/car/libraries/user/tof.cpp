@@ -2,7 +2,7 @@
 
 ToF::ToF() {
     Adafruit_VL53L0X lox;
-    float lastVal = 10000.;
+    int lastVal = 10000;
 }
 
 /**
@@ -14,16 +14,16 @@ void ToF::initialize() {
 }
 
 /**
- * @brief Gets distance from ultrasonic sensor
+ * @brief Gets distance from ToF sensor
  * 
- * @return float distance in cm
+ * @return float distance in mm
  */
-float ToF::getDist() {
-    float distance = -1;
+int ToF::getDist() {
+    int distance = lastVal;
     VL53L0X_RangingMeasurementData_t measurement;
     lox.rangingTest(&measurement, false);
     if (measurement.RangeStatus != 4) { // Phase failures have incorrect data
-        distance = lastVal = (measurement.RangeMilliMeter / 10.);
+        distance = lastVal = measurement.RangeMilliMeter;
     }
     
     return distance;

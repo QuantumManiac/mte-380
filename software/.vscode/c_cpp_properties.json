@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "Arduino",
-            "compilerPath": "C:\\Users\\renyu\\AppData\\Local\\Arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino7\\bin\\avr-g++",
+            "compilerPath": "/home/chamath/.arduino15/packages/arduino/tools/avr-gcc/7.3.0-atmel3.6.1-arduino7/bin/avr-g++",
             "compilerArgs": [
                 "-std=gnu++11",
                 "-fpermissive",
@@ -15,17 +15,18 @@
             ],
             "intelliSenseMode": "gcc-x64",
             "includePath": [
-                "C:\\Users\\renyu\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\cores\\arduino",
-                "C:\\Users\\renyu\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\variants\\mega",
-                "C:\\Users\\renyu\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\libraries\\Wire\\src",
-                "c:\\Users\\renyu\\Documents\\GitHub\\mte-380\\software\\car\\libraries\\SparkFun_MPU-9250-DMP_Arduino_Library\\src",
-                "c:\\Users\\renyu\\Documents\\GitHub\\mte-380\\software\\car\\libraries\\Adafruit_VL53L0X\\src",
-                "c:\\users\\renyu\\appdata\\local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino7\\lib\\gcc\\avr\\7.3.0\\include",
-                "c:\\users\\renyu\\appdata\\local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino7\\lib\\gcc\\avr\\7.3.0\\include-fixed",
-                "c:\\users\\renyu\\appdata\\local\\arduino15\\packages\\arduino\\tools\\avr-gcc\\7.3.0-atmel3.6.1-arduino7\\avr\\include"
+                "/home/chamath/.arduino15/packages/arduino/hardware/avr/1.8.5/cores/arduino",
+                "/home/chamath/.arduino15/packages/arduino/hardware/avr/1.8.5/variants/mega",
+                "/home/chamath/.arduino15/packages/arduino/hardware/avr/1.8.5/libraries/Wire/src",
+                "/home/chamath/Documents/Dev/GitHub/mte-380/software/car/libraries/Arduino-PID-Library",
+                "/home/chamath/Documents/Dev/GitHub/mte-380/software/car/libraries/SparkFun_MPU-9250-DMP_Arduino_Library/src",
+                "/home/chamath/Documents/Dev/GitHub/mte-380/software/car/libraries/Adafruit_VL53L0X/src",
+                "/home/chamath/.arduino15/packages/arduino/tools/avr-gcc/7.3.0-atmel3.6.1-arduino7/lib/gcc/avr/7.3.0/include",
+                "/home/chamath/.arduino15/packages/arduino/tools/avr-gcc/7.3.0-atmel3.6.1-arduino7/lib/gcc/avr/7.3.0/include-fixed",
+                "/home/chamath/.arduino15/packages/arduino/tools/avr-gcc/7.3.0-atmel3.6.1-arduino7/avr/include"
             ],
             "forcedInclude": [
-                "C:\\Users\\renyu\\AppData\\Local\\Arduino15\\packages\\arduino\\hardware\\avr\\1.8.5\\cores\\arduino\\Arduino.h"
+                "/home/chamath/.arduino15/packages/arduino/hardware/avr/1.8.5/cores/arduino/Arduino.h"
             ],
             "cStandard": "c11",
             "cppStandard": "c++11",
