@@ -1,0 +1,73 @@
+##########################################
+# Syntax Coloring Map For sTune Library
+##########################################
+
+##########################################
+# Datatypes (KEYWORD1)
+##########################################
+
+sTune	KEYWORD1
+tuner	KEYWORD1
+
+##########################################
+# Methods and Functions (KEYWORD2)
+##########################################
+
+Configure	KEYWORD2
+Run	KEYWORD2
+Reset	KEYWORD2
+printTestRun	KEYWORD2
+printResults	KEYWORD2
+printTunings	KEYWORD2
+printPidTuner	KEYWORD2
+plotter	KEYWORD2
+softPwm	KEYWORD2
+SetEmergencyStop	KEYWORD2
+SetControllerAction	KEYWORD2
+SetSerialMode	KEYWORD2
+SetTuningMethod	KEYWORD2
+GetKp	KEYWORD2
+GetKi	KEYWORD2
+GetKd	KEYWORD2
+GetTi	KEYWORD2
+GetTd	KEYWORD2
+GetProcessGain	KEYWORD2
+GetDeadTime	KEYWORD2
+GetTau	KEYWORD2
+GetControllerAction	KEYWORD2
+GetSerialMode	KEYWORD2
+GetTuningMethod	KEYWORD2
+GetAutoTunings	KEYWORD2
+init	KEYWORD2
+begin	KEYWORD2
+avgVal	KEYWORD2
+startVal	KEYWORD2
+slope	KEYWORD2
+
+##########################################
+# Constants (LITERAL1)
+##########################################
+
+directIP	LITERAL1
+direct5T	LITERAL1
+reverseIP	LITERAL1
+reverse5T	LITERAL1
+printOFF	LITERAL1
+printALL	LITERAL1
+printSUMMARY	LITERAL1
+printDEBUG	LITERAL1
+sample	LITERAL1
+test	LITERAL1
+tunings	LITERAL1
+runPid	LITERAL1
+timerPid	LITERAL1
+ZN_PID	LITERAL1
+DampedOsc_PID	LITERAL1
+NoOvershoot_PID	LITERAL1
+CohenCoon_PID	LITERAL1
+Mixed_PID	LITERAL1
+ZN_PI	LITERAL1
+DampedOsc_PI	LITERAL1
+NoOvershoot_PI	LITERAL1
+CohenCoon_PI	LITERAL1
+Mixed_PI	LITERAL1
