@@ -1,5 +1,6 @@
 #include "Wire.h"
 #include <PID_v1.h>
+#include <sTune.h>
 
 #include "libraries/user/imu.cpp"
 #include "libraries/user/motors.cpp"
@@ -7,8 +8,8 @@
 
 #define START_BUTTON_PIN 53
 
-#define SERIAL_LOGGING true    // set to false to prevent potential blocking of code
-#define CALIBRATE_IMU true     // Enables wait for 10 seconds before starting
+#define SERIAL_LOGGING false    // set to false to prevent potential blocking of code
+#define CALIBRATE_IMU false    // Enables wait for 10 seconds before starting
 #define PRINT_SENSOR_DATA true // Requires SERIAL_LOGGING to be true
 
 const int SENSOR_PRINT_INTERVAL = 250; // Interval to print sensor values using printSensorData (ms)
@@ -18,18 +19,18 @@ IMU imu;
 ToF tof;
 Motors motors;
 
-const int NUMTURNS = 11; // Number of turns to make in the course
-const float MAX_DIFF = 1.; // Threshold for difference between target and actual angle
+const int NUM_TURNS = 1; // Number of turns to make in the course
+const float MAX_DIFF = 2.; // Threshold for difference between target and actual angle
 const unsigned long MAX_SETTLE_TIME = 3000; // Max time given to PIDs to settle
 const float TURN_ANGLE = 90.;
 const float MAX_OVERSHOOT = 40.;
 const float TURN_DIST_BIAS = 2.;
-const float distToTurn[NUMTURNS] = {230., 230., 230., 500., 500., 500., 500., 780., 780., 780., 780.}; // Distances from wall (in mm) to turn at for every turn
+const float distToTurn[NUM_TURNS] = {230};//{230., 230., 230., 500., 500., 500., 500., 780., 780., 780., 780.}; // Distances from wall (in mm) to turn at for every turn
 
 
 // PID-related variables 
-const int SAMPLE_TIME = 100; // Time between PID calculations (ms)
-double turnKp = 10, turnKi = 0, turnKd = 1000;
+const int SAMPLE_TIME = 150; // Time between PID calculations (ms)
+double turnKp = 0.03, turnKi = 0, turnKd = 0.015;
 double straightKp = 10, straightKi = 0, straightKd = 1000;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
@@ -40,8 +41,8 @@ PID straightPID(&straightInput, &straightOutput, &straightTarget, straightKp, st
 
 //  Wheel speed variables
 const float MIN_SPEED = 0.2;
-const float CRUISE_SPEED = 0.8;
-const float MIN_TURN_SPEED = 0.3;
+const float CRUISE_SPEED = 0;
+const float MIN_TURN_SPEED = 0.4;
 const float MAX_TURN_SPEED = 0.8;
 
 unsigned long lastSensorPrint = 0;
@@ -64,7 +65,6 @@ void setup()
     straightPID.SetSampleTime(SAMPLE_TIME);
     turnPID.SetOutputLimits(-MAX_TURN_SPEED, MAX_TURN_SPEED); // Set output limits
     straightPID.SetOutputLimits(MIN_SPEED, CRUISE_SPEED);
-    turnPID.SetMode(AUTOMATIC); // Enable PIDs
     straightPID.SetMode(AUTOMATIC);
 
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
@@ -109,7 +109,7 @@ void loop()
     // imu.setZeroes(true, true, true); // Alternatively, we could just zero out the IMU after turning but that will accumulate error in a different way
 
     // Stop and wait when done course
-    if (turnsDone == NUMTURNS)
+    if (turnsDone == NUM_TURNS)
     {
         printLineToSerial("Done!");
         while (true);
@@ -151,18 +151,23 @@ void turnCorner()
 {
     // Stop car
     motors.brakeAllMotors();
+    // Enable PID
+    turnPID.SetMode(AUTOMATIC); 
     // Record initial values
     float initialAngle = imu.getIMUData().yaw;
-    unsigned long initialTime = millis();
+    unsigned long initialTime = 0;
     // Set target angle for PID
     turnTarget = initialAngle + TURN_ANGLE;
-
     // Keep turning until within threshold of target angle and enough time to settle has elapsed
     // TODO: settling time should start only once the robot reaches the target angle for the first time
-    while ((abs((initialAngle + TURN_ANGLE) - imu.getIMUData().yaw) > MAX_DIFF) &&  ((millis() - initialTime) > MAX_SETTLE_TIME))
-    {
+    while ((abs((TURN_ANGLE) - imu.getIMUData().yaw) >= MAX_DIFF) ||  (initialTime == 0 || ((millis() - initialTime) < MAX_SETTLE_TIME)))
+    { 
+        // Set initial time for settle once target reached for first time
+        if ((abs((TURN_ANGLE) - imu.getIMUData().yaw) <= MAX_DIFF) && initialTime == 0) {
+            initialTime = millis();
+        }
+        
         tick();
-
         // Minimum turn speed to prevent stalling
         if (turnOutput > 0 && turnOutput < MIN_TURN_SPEED)
         {
@@ -179,11 +184,15 @@ void turnCorner()
         if (millis() - lastSensorPrint > 200)
         {
             lastSensorPrint = millis();
+            printLineToSerial("Turn to target:" + String(TURN_ANGLE) + " within " + String(MAX_DIFF));
             printLineToSerial(String(millis()) + "imu yaw: " + String(imu.getIMUData().yaw));
+            printLineToSerial("PID Output: " + String(turnOutput)); 
         }
 #endif
     }
     motors.brakeAllMotors();
+    // Disable PID
+    turnPID.SetMode(MANUAL); 
 }
 
 void adjustWheels()
