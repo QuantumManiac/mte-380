@@ -8,8 +8,8 @@
 
 #define START_BUTTON_PIN 53
 
-#define SERIAL_LOGGING false    // set to false to prevent potential blocking of code
-#define CALIBRATE_IMU false    // Enables wait for 10 seconds before starting
+#define SERIAL_LOGGING true    // set to false to prevent potential blocking of code
+#define CALIBRATE_IMU true    // Enables wait for 10 seconds before starting
 #define PRINT_SENSOR_DATA true // Requires SERIAL_LOGGING to be true
 
 const int SENSOR_PRINT_INTERVAL = 250; // Interval to print sensor values using printSensorData (ms)
@@ -19,18 +19,21 @@ IMU imu;
 ToF tof;
 Motors motors;
 
-const int NUM_TURNS = 1; // Number of turns to make in the course
-const float MAX_DIFF = 2.; // Threshold for difference between target and actual angle
-const unsigned long MAX_SETTLE_TIME = 3000; // Max time given to PIDs to settle
+const int NUM_TURNS = 11; // Number of turns to make in the course
+const float MAX_DIFF = 4.; // Threshold for difference between target and actual angle
+const float MAX_PITCH = 7;
+const float MIN_TIME = 1;
+const float MIN_DIST_DIFF = 200;
+const unsigned long MAX_SETTLE_TIME = 0; // Max time given to PIDs to settle
 const float TURN_ANGLE = 90.;
 const float MAX_OVERSHOOT = 40.;
 const float TURN_DIST_BIAS = 2.;
-const float distToTurn[NUM_TURNS] = {230};//{230., 230., 230., 500., 500., 500., 500., 780., 780., 780., 780.}; // Distances from wall (in mm) to turn at for every turn
+const float distToTurn[NUM_TURNS] = {230., 230., 230., 500., 500., 500., 500., 780., 780., 780., 780.}; // Distances from wall (in mm) to turn at for every turn
 
 
 // PID-related variables 
-const int SAMPLE_TIME = 150; // Time between PID calculations (ms)
-double turnKp = 0.03, turnKi = 0, turnKd = 0.015;
+const int SAMPLE_TIME = 100; // Time between PID calculations (ms)
+double turnKp = 0.07, turnKi = 0, turnKd = 0.003;
 double straightKp = 10, straightKi = 0, straightKd = 1000;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
@@ -40,10 +43,10 @@ PID turnPID(&turnInput, &turnOutput, &turnTarget, turnKp, turnKi, turnKd, DIRECT
 PID straightPID(&straightInput, &straightOutput, &straightTarget, straightKp, straightKi, straightKd, DIRECT);
 
 //  Wheel speed variables
-const float MIN_SPEED = 0.2;
-const float CRUISE_SPEED = 0;
-const float MIN_TURN_SPEED = 0.4;
-const float MAX_TURN_SPEED = 0.8;
+const float MIN_SPEED = 0.1;
+const float CRUISE_SPEED = 0.35;
+const float MIN_TURN_SPEED = 0.1;
+const float MAX_TURN_SPEED = 0.45;
 
 unsigned long lastSensorPrint = 0;
 float distanceToWall = 0.;
@@ -59,7 +62,6 @@ void setup()
     imu.initialize();
     tof.initialize();
     motors.initialize();
-
     // Init PIDs
     turnPID.SetSampleTime(SAMPLE_TIME);
     straightPID.SetSampleTime(SAMPLE_TIME);
@@ -74,32 +76,38 @@ void setup()
 
 #if CALIBRATE_IMU
     printLineToSerial("Calibrating IMU...");
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 15; i++)
     {
+        tick();
         delay(1000);
         printLineToSerial("."); // Keep printing to serial to notify that stuff is still happening
     }
 #endif
-    imu.updateIMUState();
+    tick();
     imu.setZeroes(true, true, true); // Zero out yaw, pitch, and roll at start
+    printLineToSerial(String(imu.getIMUData().pitch) + " | " + String(imu.getIMUData().yaw)  + " | " + String(imu.getIMUData().roll));
 }
 
 void loop()
 {
     // Continue straight to next turn
     runMotors(CRUISE_SPEED, CRUISE_SPEED);
+    float prevDist = tof.getDist();
 
-    while (tof.getDist() > (distToTurn[turnsDone] + TURN_DIST_BIAS)) // While distance to wall is greater than the turning threshold
+    while (tof.getDist() > (distToTurn[turnsDone] + TURN_DIST_BIAS) || inPit(prevDist, tof.getDist())) // While distance to wall is greater than the turning threshold
     {
         tick();
-#if PRINT_SENSOR_DATA
-        // Sensor data printing routine
-        if (millis() - lastSensorPrint > SENSOR_PRINT_INTERVAL)
-        {
-            lastSensorPrint = millis();
-            printSensorData();
+        #if PRINT_SENSOR_DATA
+            // Sensor data printing routine
+            if (millis() - lastSensorPrint > SENSOR_PRINT_INTERVAL)
+            {
+                lastSensorPrint = millis();
+                printSensorData();
+            }
+        #endif
+        if (abs(imu.getIMUData().pitch) < MAX_PITCH) { // if the pitch angle is greater than the maximum pitch of the course and the distance does not jump to a small number in a short period of time
+            prevDist = tof.getDist();
         }
-#endif
         adjustWheels(); // This function is empty
     }
 
@@ -114,6 +122,16 @@ void loop()
         printLineToSerial("Done!");
         while (true);
     }
+}
+
+/**
+ * @brief checks the difference between the current value to the wall and the previous value to the wall
+ * 
+ * @param prevDist previous distance to wall recorded
+ * @param currDist current distance to wall recorded
+ */
+bool inPit(float prevDist, float currDist) {
+    return (prevDist - currDist) > MIN_DIST_DIFF; // return the difference between the previous distance and the current distance
 }
 
 /**

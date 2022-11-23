@@ -10,7 +10,8 @@ ToF::ToF() {
  * 
  */
 void ToF::initialize() {
-        Serial.println(lox.begin() ? "VL53L0X OK" : "VL53L0X ERROR");
+    lox.begin();
+        // Serial.println(lox.begin() ? "VL53L0X OK" : "VL53L0X ERROR");
 }
 
 /**
@@ -19,11 +20,11 @@ void ToF::initialize() {
  * @return float distance in mm
  */
 int ToF::getDist() {
-    int distance = lastVal;
+    int distance = 10000;
     VL53L0X_RangingMeasurementData_t measurement;
     lox.rangingTest(&measurement, false);
     if (measurement.RangeStatus != 4) { // Phase failures have incorrect data
-        distance = lastVal = measurement.RangeMilliMeter;
+        distance = measurement.RangeMilliMeter;
     }
     
     return distance;
