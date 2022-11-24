@@ -50,8 +50,8 @@ PID turnPID(&turnInput, &turnOutput, &turnTarget, turnKp, turnKi, turnKd, DIRECT
 PID straightPID(&straightInput, &straightOutput, &straightTarget, straightKp, straightKi, straightKd, DIRECT);
 
 //  Wheel speed variables
-const float MIN_SPEED = 0.3;
-const float CRUISE_SPEED = 0.4;
+const float MIN_SPEED = 0.25;
+const float CRUISE_SPEED = 0.38;
 const float MIN_TURN_SPEED = 0.35;
 const float MAX_TURN_SPEED = 0.55;
 
@@ -127,16 +127,6 @@ void loop()
             motors.setMotorPower(back_left, 0.55);
             delay(500);
         }
-
-        printLineToSerial("Pitch: " + String(imu.getIMUData().pitch) + "Distance: " + String(tof.getDist()) + "Prev Dist: " + String(prevDist));
-        // if its leaving the pit, REVERSE
-        if (imu.getIMUData().pitch < -100) {
-            printLineToSerial("Reversed: " + String(imu.getIMUData().pitch));
-            runMotors(-CRUISE_SPEED, -CRUISE_SPEED);
-            delay(1000);
-        } else {
-            runMotors(CRUISE_SPEED, CRUISE_SPEED);
-        }
         
         if (tof.getDist() < (distToTurn[turnsDone] + 250)) {
             runMotors(MIN_SPEED, MIN_SPEED);
@@ -192,7 +182,7 @@ void wallStop() {
         return;
     }
 
-    float savedTime = millis();
+    unsigned long savedTime = millis();
     while (abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) > TURN_DIST_TOL || ((millis() - savedTime) < TURN_DIST_TIME)) {
         // Move forward or backward to move to right distance
         if (tof.getDist() > (distToTurn[turnsDone] + TURN_DIST_BIAS)) {
