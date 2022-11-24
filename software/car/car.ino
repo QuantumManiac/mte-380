@@ -8,11 +8,11 @@
 
 #define START_BUTTON_PIN 53
 
-#define SERIAL_LOGGING true    // set to false to prevent potential blocking of code
+#define SERIAL_LOGGING false   // set to false to prevent potential blocking of code
 #define CALIBRATE_IMU true    // Enables wait for 10 seconds before starting
 #define PRINT_SENSOR_DATA true // Requires SERIAL_LOGGING to be true
 
-const int SENSOR_PRINT_INTERVAL = 250; // Interval to print sensor values using printSensorData (ms)
+const int SENSOR_PRINT_INTERVAL = 300; // Interval to print sensor values using printSensorData (ms)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         RINT_INTERVAL = 250; // Interval to print sensor values using printSensorData (ms)
 
 // Initialize objects
 IMU imu;
@@ -24,19 +24,24 @@ const float MAX_DIFF = 2.5; // Threshold for difference between target and actua
 const float MAX_PITCH = 6;
 const float MIN_TIME = 1;
 const float MIN_DIST_DIFF = 200;
+const float MIN_PITCH = -30;
+const float OUT_PIT = 0.6;
 const unsigned long MAX_SETTLE_TIME = 0; // Max time given to PIDs to settle
 const float TURN_ANGLE = 90.;
 const float MAX_OVERSHOOT = 40.;
-const float TURN_DIST_BIAS = -50.; // distance adjustment
-const float TURN_DIST_TOL = 30;
+const float SPEED_DROP_DIST = 2;
+const float TURN_DIST_BIAS = -50.; // to adjust steady state turn distance
+const float TURN_STOP_BIAS = 75; // to adjust distance before stopping to adjust before turning
+const float TURN_DIST_TOL = 35;
 const float TURN_DIST_TIME = 1000;
-const float distToTurn[NUM_TURNS] = {230., 230., 230., 500., 500., 500., 500., 780., 780., 780., 780.}; // Distances from wall (in mm) to turn at for every turn
+const float STRAIGHT_TOL = 2;
+const float distToTurn[NUM_TURNS] = {130., 130., 130., 400., 400., 400., 400., 680., 680., 680., 680.}; // Distances from wall (in mm) to turn at for every turn
 
 
 // PID-related variables 
 const int SAMPLE_TIME = 100; // Time between PID calculations (ms)
 double turnKp = 0.1, turnKi = 0, turnKd = 0.003;
-double straightKp = 10, straightKi = 0, straightKd = 1000;
+double straightKp = 250, straightKi = 0, straightKd = 10;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
 double turnTarget = 0;
@@ -45,10 +50,10 @@ PID turnPID(&turnInput, &turnOutput, &turnTarget, turnKp, turnKi, turnKd, DIRECT
 PID straightPID(&straightInput, &straightOutput, &straightTarget, straightKp, straightKi, straightKd, DIRECT);
 
 //  Wheel speed variables
-const float MIN_SPEED = 0.25;
-const float CRUISE_SPEED = 0.35;
-const float MIN_TURN_SPEED = 0.25;
-const float MAX_TURN_SPEED = 0.45;
+const float MIN_SPEED = 0.3;
+const float CRUISE_SPEED = 0.45;
+const float MIN_TURN_SPEED = 0.35;
+const float MAX_TURN_SPEED = 0.55;
 
 unsigned long lastSensorPrint = 0;
 float distanceToWall = 0.;
@@ -75,6 +80,7 @@ void setup()
     printLineToSerial("Waiting for start button press"); // TODO: This should be in two stages for game day: press start button to go through calibration and/or pre-flight checks and then start again to go through the course
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
     printLineToSerial("Start button pressed");
+
     imu.setZeroes(true, true, true);
 #if CALIBRATE_IMU
     printLineToSerial("Calibrating IMU...");
@@ -88,9 +94,6 @@ void setup()
 #endif
     tick();
     imu.setZeroes(true, true, true); // Zero out yaw, pitch, and roll at start
-    while(true) {
-        printLineToSerial("TOF: " + String(tof.getDist()));
-    }
     printLineToSerial(String(imu.getIMUData().pitch) + " | " + String(imu.getIMUData().yaw)  + " | " + String(imu.getIMUData().roll));
 }
 
@@ -101,7 +104,9 @@ void loop()
     float prevDist = tof.getDist();
     float initialAngle = imu.getIMUData().yaw; // Turn 90 CW from at next turn
 
-    while (tof.getDist() > (distToTurn[turnsDone] + TURN_DIST_BIAS) || inPit(prevDist, tof.getDist())) // While distance to wall is greater than the turning threshold
+    straightPID.SetMode(AUTOMATIC); // re-init straightness PID
+
+    while (tof.getDist() > (distToTurn[turnsDone] + TURN_STOP_BIAS) || inPit(prevDist, tof.getDist())) // While distance to wall is greater than the turning threshold
     {
         tick();
         #if PRINT_SENSOR_DATA
@@ -115,22 +120,32 @@ void loop()
         if (abs(imu.getIMUData().pitch) < MAX_PITCH) { // if the pitch angle is greater than the maximum pitch of the course and the distance does not jump to a small number in a short period of time
             prevDist = tof.getDist();
         }
-        // if its leaving the pit, increase back wheel motor speed
-        if (imu.getIMUData().pitch < -15) {
-            motors.setMotorPower(back_left, 0.55);
-            motors.setMotorPower(back_right, 0.55);
+        // if its leaving the pit, REVERSE
+        if (imu.getIMUData().pitch < -130) {
+            printLineToSerial("Reversed: " + String(imu.getIMUData().pitch));
+            runMotors(-CRUISE_SPEED, -CRUISE_SPEED);
+            delay(1000);
         } else {
             runMotors(CRUISE_SPEED, CRUISE_SPEED);
         }
         
-        adjustWheels(); // This function is empty
+        if (tof.getDist() < (distToTurn[turnsDone] + distToTurn[turnsDone])) {
+            printLineToSerial("Reduced Speed in loop");
+            runMotors(MIN_SPEED, MIN_SPEED);
+        }
+
+        if(abs(imu.getIMUData().yaw - initialAngle) > STRAIGHT_TOL)
+            adjustWheels(initialAngle); 
     }
+
+    straightPID.SetMode(MANUAL);
     printLineToSerial("Stop Distance: " + String(tof.getDist()));
     wallStop();
 
     // TODO: Center in tile before turning
     turnCorner(initialAngle);
     turnsDone += 1;
+    printLineToSerial("============!!!TURNS DONE!!!: " + String(turnsDone) + "======================");
     imu.addToOffsets(-90, 0, 0); // Subtract 90 degrees from yaw offset so we're still close to zero degree heading after the turn, but accounting for the error
     // imu.setZeroes(true, true, true); // Alternatively, we could just zero out the IMU after turning but that will accumulate error in a different way
 
@@ -154,9 +169,9 @@ void wallStop() {
     while (abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) > TURN_DIST_TOL || ((millis() - savedTime) < TURN_DIST_TIME)) {
         // Move forward or backward to move to right distance
         if (tof.getDist() > (distToTurn[turnsDone] + TURN_DIST_BIAS)) {
-            runMotors(0.2, 0.2);
+            runMotors(0.25, 0.25);
         } else {
-            runMotors(-0.2, -0.2);
+            runMotors(-0.25, -0.25);
         }
         if (abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) > TURN_DIST_TOL) {
             savedTime = millis();
@@ -254,11 +269,18 @@ void turnCorner(float initialAngle)
     turnPID.SetMode(MANUAL); 
 }
 
-void adjustWheels()
+void adjustWheels(float targetAngle)
 {
-    // TODO: Write. Should bring in whatever code from previous version of function that is relevant
-
-}
+    float speedScaling = 1;
+    if (tof.getDist() < (distToTurn[turnsDone] + (distToTurn[turnsDone]))) {
+            speedScaling = 0.67;
+            printLineToSerial("Speed Scaling: " + String(speedScaling));
+        }
+    if (imu.getIMUData().yaw > targetAngle)
+        runMotors(MIN_SPEED*speedScaling, (straightOutput+CRUISE_SPEED)*speedScaling);
+    else
+        runMotors((straightOutput+CRUISE_SPEED)*speedScaling, MIN_SPEED*speedScaling);
+}   
 
 /**
  * @brief Prints the sensor data to the serial monitor
