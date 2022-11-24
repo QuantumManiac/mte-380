@@ -8,7 +8,7 @@
 
 #define START_BUTTON_PIN 53
 
-#define SERIAL_LOGGING false   // set to false to prevent potential blocking of code
+#define SERIAL_LOGGING true   // set to false to prevent potential blocking of code
 #define CALIBRATE_IMU true    // Enables wait for 10 seconds before starting
 #define PRINT_SENSOR_DATA true // Requires SERIAL_LOGGING to be true
 
@@ -20,28 +20,28 @@ ToF tof;
 Motors motors;
 
 const int NUM_TURNS = 11; // Number of turns to make in the course
-const float MAX_DIFF = 2.5; // Threshold for difference between target and actual angle
-const float MAX_PITCH = 6;
+const float MAX_DIFF = 5; // Threshold for difference between target and actual angle
+const float MAX_PITCH = 6; // Threshold for pit detection
 const float MIN_TIME = 1;
 const float MIN_DIST_DIFF = 200;
-const float MIN_PITCH = -30;
+const float MIN_PITCH = -20;
 const float OUT_PIT = 0.6;
-const unsigned long MAX_SETTLE_TIME = 0; // Max time given to PIDs to settle
+const unsigned long MAX_SETTLE_TIME = 500; // Max time given to PIDs to settle
 const float TURN_ANGLE = 90.;
 const float MAX_OVERSHOOT = 40.;
 const float SPEED_DROP_DIST = 2;
 const float TURN_DIST_BIAS = -50.; // to adjust steady state turn distance
 const float TURN_STOP_BIAS = 75; // to adjust distance before stopping to adjust before turning
-const float TURN_DIST_TOL = 35;
+float TURN_DIST_TOL = 35;
 const float TURN_DIST_TIME = 1000;
 const float STRAIGHT_TOL = 2;
-const float distToTurn[NUM_TURNS] = {130., 130., 130., 400., 400., 400., 400., 680., 680., 680., 680.}; // Distances from wall (in mm) to turn at for every turn
+const float distToTurn[NUM_TURNS] = {130., 130., 130., 450., 450., 450., 450., 680., 680., 680., 680}; // Distances from wall (in mm) to turn at for every turn
 
 
 // PID-related variables 
 const int SAMPLE_TIME = 100; // Time between PID calculations (ms)
-double turnKp = 0.1, turnKi = 0, turnKd = 0.003;
-double straightKp = 250, straightKi = 0, straightKd = 10;
+double turnKp = 0.1, turnKi = 0.01, turnKd = 0.015;
+double straightKp = 250, straightKi = 0.01, straightKd = 10;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
 double turnTarget = 0;
@@ -51,7 +51,7 @@ PID straightPID(&straightInput, &straightOutput, &straightTarget, straightKp, st
 
 //  Wheel speed variables
 const float MIN_SPEED = 0.3;
-const float CRUISE_SPEED = 0.45;
+const float CRUISE_SPEED = 0.4;
 const float MIN_TURN_SPEED = 0.35;
 const float MAX_TURN_SPEED = 0.55;
 
@@ -78,6 +78,7 @@ void setup()
 
     pinMode(START_BUTTON_PIN, INPUT_PULLUP);
     printLineToSerial("Waiting for start button press"); // TODO: This should be in two stages for game day: press start button to go through calibration and/or pre-flight checks and then start again to go through the course
+   
     while (digitalRead(START_BUTTON_PIN) == HIGH); // Wait until start button is pressed
     printLineToSerial("Start button pressed");
 
@@ -106,7 +107,7 @@ void loop()
 
     straightPID.SetMode(AUTOMATIC); // re-init straightness PID
 
-    while (tof.getDist() > (distToTurn[turnsDone] + TURN_STOP_BIAS) || inPit(prevDist, tof.getDist())) // While distance to wall is greater than the turning threshold
+    while (((tof.getDist() > (distToTurn[turnsDone] + TURN_STOP_BIAS)) || inPit(prevDist, tof.getDist())) && (turnsDone < 8)) // While distance to wall is greater than the turning threshold
     {
         tick();
         #if PRINT_SENSOR_DATA
@@ -117,11 +118,19 @@ void loop()
                 printSensorData();
             }
         #endif
-        if (abs(imu.getIMUData().pitch) < MAX_PITCH) { // if the pitch angle is greater than the maximum pitch of the course and the distance does not jump to a small number in a short period of time
+        if (imu.getIMUData().pitch < MAX_PITCH) { // if the pitch angle is greater than the maximum pitch of the course and the distance does not jump to a small number in a short period of time
             prevDist = tof.getDist();
         }
+
+        if (imu.getIMUData().pitch < MIN_PITCH) {
+            motors.setMotorPower(back_right, 0.55);
+            motors.setMotorPower(back_left, 0.55);
+            delay(500);
+        }
+
+        printLineToSerial("Pitch: " + String(imu.getIMUData().pitch) + "Distance: " + String(tof.getDist()) + "Prev Dist: " + String(prevDist));
         // if its leaving the pit, REVERSE
-        if (imu.getIMUData().pitch < -130) {
+        if (imu.getIMUData().pitch < -100) {
             printLineToSerial("Reversed: " + String(imu.getIMUData().pitch));
             runMotors(-CRUISE_SPEED, -CRUISE_SPEED);
             delay(1000);
@@ -129,8 +138,7 @@ void loop()
             runMotors(CRUISE_SPEED, CRUISE_SPEED);
         }
         
-        if (tof.getDist() < (distToTurn[turnsDone] + distToTurn[turnsDone])) {
-            printLineToSerial("Reduced Speed in loop");
+        if (tof.getDist() < (distToTurn[turnsDone] + 250)) {
             runMotors(MIN_SPEED, MIN_SPEED);
         }
 
@@ -145,6 +153,7 @@ void loop()
     // TODO: Center in tile before turning
     turnCorner(initialAngle);
     turnsDone += 1;
+    imu.setZeroes(0,1,0);
     printLineToSerial("============!!!TURNS DONE!!!: " + String(turnsDone) + "======================");
     imu.addToOffsets(-90, 0, 0); // Subtract 90 degrees from yaw offset so we're still close to zero degree heading after the turn, but accounting for the error
     // imu.setZeroes(true, true, true); // Alternatively, we could just zero out the IMU after turning but that will accumulate error in a different way
@@ -165,19 +174,38 @@ void wallStop() {
     motors.brakeAllMotors();
     delay(100);
     printLineToSerial("Entered wall stop fxn at " + String(millis()));
+    tick();
+
+    if(turnsDone == 8) {
+        TURN_DIST_TOL = 75; // Relax tolerance in last few turns
+        runMotors(0.25, 0.25);
+        delay(1500);
+        motors.brakeAllMotors();
+        return;
+    }
+    else if(turnsDone > 8)
+    {
+        TURN_DIST_TOL = 75; // Relax tolerance in last few turns
+        runMotors(0.25, 0.25);
+        delay(750);
+        motors.brakeAllMotors();
+        return;
+    }
+
     float savedTime = millis();
     while (abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) > TURN_DIST_TOL || ((millis() - savedTime) < TURN_DIST_TIME)) {
         // Move forward or backward to move to right distance
         if (tof.getDist() > (distToTurn[turnsDone] + TURN_DIST_BIAS)) {
-            runMotors(0.25, 0.25);
+            runMotors(0.23, 0.23);
         } else {
-            runMotors(-0.25, -0.25);
+            runMotors(-0.23, -0.23);
         }
         if (abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) > TURN_DIST_TOL) {
             savedTime = millis();
         } else {
             motors.brakeAllMotors();
         }
+        tick();
     }
 }
 
@@ -229,17 +257,18 @@ void turnCorner(float initialAngle)
     // Enable PID
     turnPID.SetMode(AUTOMATIC); 
     // Record initial values
-    unsigned long initialTime = 0;
+    unsigned long savedTime = millis();
     // Set target angle for PID
     turnTarget = initialAngle + TURN_ANGLE;
     // Keep turning until within threshold of target angle and enough time to settle has elapsed
     // TODO: settling time should start only once the robot reaches the target angle for the first time
-    while ((abs((turnTarget) - imu.getIMUData().yaw) >= MAX_DIFF) ||  (initialTime == 0 || ((millis() - initialTime) < MAX_SETTLE_TIME)))
+    while ((abs((turnTarget) - imu.getIMUData().yaw) >= MAX_DIFF) /*|| ((millis() - savedTime) < MAX_SETTLE_TIME)*/)
     { 
-        // Set initial time for settle once target reached for first time
-        if ((abs((TURN_ANGLE) - imu.getIMUData().yaw) <= MAX_DIFF) && initialTime == 0) {
-            initialTime = millis();
-        }
+        /*if (abs(imu.getIMUData().yaw - turnTarget) > MAX_DIFF) {
+            savedTime = millis();
+        } else {
+            motors.brakeAllMotors();
+        } */
         
         tick();
         // Minimum turn speed to prevent stalling
@@ -272,7 +301,7 @@ void turnCorner(float initialAngle)
 void adjustWheels(float targetAngle)
 {
     float speedScaling = 1;
-    if (tof.getDist() < (distToTurn[turnsDone] + (distToTurn[turnsDone]))) {
+    if (tof.getDist() < (distToTurn[turnsDone] + 250)) {
             speedScaling = 0.67;
             printLineToSerial("Speed Scaling: " + String(speedScaling));
         }
