@@ -2,6 +2,7 @@
     "board": "arduino:avr:mega",
     "port": "COM4",
     "sketch": "car/car.ino",
+    "output": "./car/build",
     "buildPreferences": [
         [
             "sketchbook.path",
