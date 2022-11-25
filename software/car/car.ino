@@ -40,7 +40,7 @@ const float distToTurn[NUM_TURNS] = {130., 130., 130., 400., 400., 400., 400., 6
 
 // PID-related variables 
 const int SAMPLE_TIME = 100; // Time between PID calculations (ms)
-double turnKp = 0.1, turnKi = 0.01, turnKd = 0.009;
+double turnKp = 0.1, turnKi = 0.01, turnKd = 0.005;
 double straightKp = 500, straightKi = 0.01, straightKd = 10;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
@@ -212,13 +212,24 @@ void wallStop() {
         } else {
             motors.brakeAllMotors();
         }
-        if (abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) < 120) {
+        if (abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) < 60) {
             outTime = millis();
         }
 
-        if ((millis() - outTime) > 2000) {
+        if ((millis() - outTime) > 2000 && (millis() - outTime) < 6000) {
             wallSpeed = CRUISE_SPEED + 0.2;
-        } else {
+        } 
+        else if ((millis() - outTime) > 6000) {
+            wallSpeed = -(wallSpeed/abs(wallSpeed))*MIN_SPEED;
+            delay(1000);
+            while(abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) < 60) {
+                wallSpeed = -(wallSpeed/abs(wallSpeed))*(CRUISE_SPEED + 0.2);
+                delay(1000);
+                wallSpeed = (wallSpeed/abs(wallSpeed))*MIN_SPEED;
+                delay(500);
+            }
+        }
+        else {
             wallSpeed = MIN_SPEED;
         }
         printLineToSerial("TOF: " + String(tof.getDist()) + " Wall Speed: " + String(wallSpeed));
