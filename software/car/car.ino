@@ -41,7 +41,7 @@ const float distToTurn[NUM_TURNS] = {130., 130., 130., 400., 400., 400., 400., 6
 // PID-related variables 
 const int SAMPLE_TIME = 100; // Time between PID calculations (ms)
 double turnKp = 0.11, turnKi = 0.01, turnKd = 0.009;
-double straightKp = 500, straightKi = 0.01, straightKd = 10;
+double straightKp = 120, straightKi = 0.01, straightKd = 10;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
 double turnTarget = 0;
@@ -127,7 +127,6 @@ void loop()
         }
         // if its leaving the pit, REVERSE
         if (imu.getIMUData().pitch < -130) {
-            printLineToSerial("Reversed: " + String(imu.getIMUData().pitch));
             runMotors(-CRUISE_SPEED, -CRUISE_SPEED);
             delay(1000);
         } else {
@@ -135,7 +134,6 @@ void loop()
         }
         
         if (tof.getDist() < (distToTurn[turnsDone] + distToTurn[turnsDone])) {
-            printLineToSerial("Reduced Speed in loop");
             runMotors(MIN_SPEED, MIN_SPEED);
         }
 
@@ -150,10 +148,8 @@ void loop()
     // TODO: Center in tile before turning
     turnCorner(initialAngle);
     turnsDone += 1;
-    printLineToSerial("Sensor Right Before Setting Pitch to Zero");
     printSensorData();
-    imu.setZeroes(0 , 1, 0);
-    printLineToSerial("Sensor Right After Setting Pitch to Zero");
+    imu.setZeroes(0, 1, 0);
     printSensorData();
     printLineToSerial("============!!!TURNS DONE!!!: " + String(turnsDone) + "======================");
     imu.addToOffsets(-90, 0, 0); // Subtract 90 degrees from yaw offset so we're still close to zero degree heading after the turn, but accounting for the error
@@ -174,7 +170,6 @@ void loop()
 void wallStop() {
     motors.brakeAllMotors();
     delay(500);
-    printLineToSerial("Entered wall stop fxn at " + String(millis()));
     tick();
 
     // Handling Last Few Turns
@@ -224,6 +219,7 @@ void wallStop() {
             delay(500);
             wallSpeed = -(wallSpeed/abs(wallSpeed))*(CRUISE_SPEED + 0.2);
             while(abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) < 60) {
+                tick();
                 wallSpeed = (wallSpeed/abs(wallSpeed))*(CRUISE_SPEED + 0.2);
                 delay(1000);
                 wallSpeed = (wallSpeed/abs(wallSpeed))*MIN_SPEED;
@@ -332,7 +328,6 @@ void adjustWheels(float targetAngle)
     float speedScaling = 1;
     if (tof.getDist() < (distToTurn[turnsDone] + (distToTurn[turnsDone]))) {
             speedScaling = 0.67;
-            printLineToSerial("Speed Scaling: " + String(speedScaling));
         }
     /*if (imu.getIMUData().yaw > targetAngle)
         runMotors(MIN_SPEED*speedScaling, (straightOutput+CRUISE_SPEED)*speedScaling);
