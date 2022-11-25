@@ -26,7 +26,7 @@ const float MIN_TIME = 1;
 const float MIN_DIST_DIFF = 200;
 const float MIN_PITCH = -30;
 const float OUT_PIT = 0.6;
-const unsigned long MAX_SETTLE_TIME = 500; // Max time given to PIDs to settle
+const unsigned long MAX_SETTLE_TIME = 0; // Max time given to PIDs to settle
 const float TURN_ANGLE = 90.;
 const float MAX_OVERSHOOT = 40.;
 const float SPEED_DROP_DIST = 2;
@@ -40,7 +40,7 @@ const float distToTurn[NUM_TURNS] = {130., 130., 130., 400., 400., 400., 400., 6
 
 // PID-related variables 
 const int SAMPLE_TIME = 100; // Time between PID calculations (ms)
-double turnKp = 0.1, turnKi = 0.01, turnKd = 0.005;
+double turnKp = 0.11, turnKi = 0.01, turnKd = 0.009;
 double straightKp = 500, straightKi = 0.01, straightKd = 10;
 double turnInput, turnOutput; // Variables for turning PID control
 double straightInput, straightOutput; // Variables for keeping straight PID control
@@ -52,8 +52,8 @@ PID straightPID(&straightInput, &straightOutput, &straightTarget, straightKp, st
 //  Wheel speed variables
 const float MIN_SPEED = 0.27;
 const float CRUISE_SPEED = 0.4;
-const float MIN_TURN_SPEED = 0.27;
-const float MAX_TURN_SPEED = 0.4;
+const float MIN_TURN_SPEED = 0.3;
+const float MAX_TURN_SPEED = 0.5;
 
 unsigned long lastSensorPrint = 0;
 float distanceToWall = 0.;
@@ -221,9 +221,10 @@ void wallStop() {
         } 
         else if ((millis() - outTime) > 6000) {
             wallSpeed = -(wallSpeed/abs(wallSpeed))*MIN_SPEED;
-            delay(1000);
+            delay(500);
+            wallSpeed = -(wallSpeed/abs(wallSpeed))*(CRUISE_SPEED + 0.2);
             while(abs(tof.getDist() - (distToTurn[turnsDone] + TURN_DIST_BIAS)) < 60) {
-                wallSpeed = -(wallSpeed/abs(wallSpeed))*(CRUISE_SPEED + 0.2);
+                wallSpeed = (wallSpeed/abs(wallSpeed))*(CRUISE_SPEED + 0.2);
                 delay(1000);
                 wallSpeed = (wallSpeed/abs(wallSpeed))*MIN_SPEED;
                 delay(500);
